@@ -1,0 +1,11 @@
+{
+  "territories": [
+    {
+      "id": "EUROPA_URAL",
+      "name": "Ural",
+      "continentId": "EUROPA",
+      "neighbors": [],
+      "anchor": { "x": 120, "y": 64 }
+    }
+  ]
+}
