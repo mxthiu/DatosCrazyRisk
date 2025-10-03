@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XnaContent xmlns:ns="Microsoft.Xna.Framework.Content.Pipeline.Graphics">
+  <Asset Type="ns:FontDescription">
+    <FontName>UI.ttf</FontName>
+    <Size>18</Size>
+    <Spacing>0</Spacing>
+    <UseKerning>true</UseKerning>
+    <Style>Regular</Style>
+    <CharacterRegions>
+      <CharacterRegion>
+        <Start>&#x0020;</Start>
+        <End>&#x007E;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#x00A0;</Start>
+        <End>&#x00FF;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#x0100;</Start>
+        <End>&#x017F;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#x0180;</Start>
+        <End>&#x024F;</End>
+      </CharacterRegion>
+    </CharacterRegions>
+  </Asset>
+</XnaContent>

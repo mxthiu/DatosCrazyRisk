@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = CrazyRisk.Core
+build_property.ProjectDir = /Users/mathi/CrazyRisk/Source/CrazyRisk.Core/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

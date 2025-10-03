@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SourceFileCollection xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Profile>HiDef</Profile>
+  <Platform>DesktopGL</Platform>
+  <Config />
+  <SourceFiles>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/UI/menu_bg.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_ALEMANIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_SUDAFRICA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_INDONESIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_COREADELSUR.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_PERU.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_URUGUAY.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/OCEANIA_NUEVAZELANDA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_NORUEGA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_TURQUIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_MEXICO.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_GRECIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/OCEANIA_PAPUANUEVAGUINEA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_HAITI.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_BRASIL.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_JAPON.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_ARGENTINA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_ESPANA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_COLOMBIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_CANADA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_EGIPTO.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_FILIPINAS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_rusia.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/OCEANIA_AUSTRALIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_CHINA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_IRAN.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_GUATEMALA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_ITALIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/EUROPA_FRANCIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_CUBA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_MADAGASCAR.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_ESTADOSUNIDOS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_MARRUECOS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_INDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_TAILANDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_ETIOPIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_NIGERIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_ISRAEL.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/SURAMERICA_CHILE.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/NORTEAMERICA_GROENLANDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/ASIA_ARABIASAUDITA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/OCEANIA_FIYI.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/territories/AFRICA_KENIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/symbols/infanteria.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/symbols/artilleria.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/symbols/caballeria.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/jokers/comodinmega.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Cards/jokers/comodincompleto.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/map_indice_conpuentes.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_4.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_5.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_6.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_2.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_3.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_1.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_F4.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_F3.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_F2.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/Dice/Dice_F1.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/map_naked_conpuentes.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/map_naked.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/map_marcado.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_ALEMANIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_SUDAFRICA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_INDONESIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_PERU.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_URUGUAY.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_NORUEGA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_TURQUIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_MEXICO.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/OCEANIA_PAPUA_NUEVA_GUINEA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_GRECIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_HAITI.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_BRASIL.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_JAPON.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_ARGENTINA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_ESPANA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/OCEANIA_NUEVA_ZELANDA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_COLOMBIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_CANADA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_EGIPTO.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_FILIPINAS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_RUSIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/OCEANIA_AUSTRALIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_CHINA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_IRAN.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_GUATEMALA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_ITALIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/EUROPA_FRANCIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_ESTADOS_UNIDOS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_CUBA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_MADAGASCAR.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_ARABIA_SAUDITA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_MARRUECOS.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_INDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_TAILANDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_ETIOPIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_NIGERIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_ISRAEL.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/SURAMERICA_CHILE.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_GROENLANDIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/ASIA_COREA_DEL_SUR.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/OCEANIA_FIYI.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/AFRICA_KENIA.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Fonts/Default.spritefont</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Audio/Music/music_menu.wav</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Audio/Music/music_game1.wav</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Audio/Music/music_game2.wav</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Audio/Music/music_game3.wav</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso1.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso2.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso3.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso4.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso5.png</File>
+    <File>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/avatars/perso6.png</File>
+  </SourceFiles>
+  <DestFiles>
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+  </DestFiles>
+</SourceFileCollection>

@@ -1,0 +1,10 @@
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/bin/Debug/netstandard2.1/CrazyRisk.Core.deps.json
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/bin/Debug/netstandard2.1/CrazyRisk.Core.dll
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/bin/Debug/netstandard2.1/CrazyRisk.Core.pdb
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.csproj.AssemblyReference.cache
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.AssemblyInfoInputs.cache
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.AssemblyInfo.cs
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.csproj.CoreCompileInputs.cache
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.dll
+/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.pdb

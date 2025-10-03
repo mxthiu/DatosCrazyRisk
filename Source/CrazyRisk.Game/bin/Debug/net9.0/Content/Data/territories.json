@@ -1,0 +1,172 @@
+{
+  "territories": [
+    {
+      "id": "NORTEAMERICA_CANADA",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_ESTADOS_UNIDOS",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_MEXICO",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_GROENLANDIA",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_CUBA",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_HAITI",
+      "neighbors": []
+    },
+    {
+      "id": "NORTEAMERICA_GUATEMALA",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_BRASIL",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_ARGENTINA",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_CHILE",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_PERU",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_COLOMBIA",
+      "neighbors": []
+    },
+    {
+      "id": "SURAMERICA_URUGUAY",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_ESPANA",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_FRANCIA",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_ALEMANIA",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_ITALIA",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_NORUEGA",
+      "neighbors": []
+    },
+    {
+      "id": "EUROPA_GRECIA",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_EGIPTO",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_NIGERIA",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_SUDAFRICA",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_MARRUECOS",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_KENIA",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_ETIOPIA",
+      "neighbors": []
+    },
+    {
+      "id": "AFRICA_MADAGASCAR",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_CHINA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_INDIA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_JAPON",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_COREA_DEL_SUR",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_ARABIA_SAUDITA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_IRAN",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_ISRAEL",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_TURQUIA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_RUSIA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_INDONESIA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_TAILANDIA",
+      "neighbors": []
+    },
+    {
+      "id": "ASIA_FILIPINAS",
+      "neighbors": []
+    },
+    {
+      "id": "OCEANIA_AUSTRALIA",
+      "neighbors": []
+    },
+    {
+      "id": "OCEANIA_NUEVA_ZELANDA",
+      "neighbors": []
+    },
+    {
+      "id": "OCEANIA_PAPUA_NUEVA_GUINEA",
+      "neighbors": []
+    },
+    {
+      "id": "OCEANIA_FIYI",
+      "neighbors": []
+    }
+  ]
+}

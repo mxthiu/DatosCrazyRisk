@@ -1,0 +1,698 @@
+#----------------------------- Global Properties ----------------------------#
+/platform:DesktopGL
+/quiet
+/profile:HiDef
+/compress:False
+/intermediateDir:obj/$(Platform)
+/outputDir:bin/$(Platform)
+
+#---------------------------------- Content ---------------------------------#
+
+#begin Sprites/UI/menu_bg.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/UI/menu_bg.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_ALEMANIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_ALEMANIA.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_SUDAFRICA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_SUDAFRICA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_INDONESIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_INDONESIA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_COREADELSUR.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_COREADELSUR.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_PERU.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_PERU.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_URUGUAY.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_URUGUAY.png
+#end
+
+#begin Sprites/Cards/territories/OCEANIA_NUEVAZELANDA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/OCEANIA_NUEVAZELANDA.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_NORUEGA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_NORUEGA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_TURQUIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_TURQUIA.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_MEXICO.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_MEXICO.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_GRECIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_GRECIA.png
+#end
+
+#begin Sprites/Cards/territories/OCEANIA_PAPUANUEVAGUINEA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/OCEANIA_PAPUANUEVAGUINEA.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_HAITI.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_HAITI.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_BRASIL.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_BRASIL.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_JAPON.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_JAPON.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_ARGENTINA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_ARGENTINA.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_ESPANA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_ESPANA.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_COLOMBIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_COLOMBIA.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_CANADA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_CANADA.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_EGIPTO.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_EGIPTO.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_FILIPINAS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_FILIPINAS.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_rusia.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_rusia.png
+#end
+
+#begin Sprites/Cards/territories/OCEANIA_AUSTRALIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/OCEANIA_AUSTRALIA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_CHINA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_CHINA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_IRAN.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_IRAN.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_GUATEMALA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_GUATEMALA.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_ITALIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_ITALIA.png
+#end
+
+#begin Sprites/Cards/territories/EUROPA_FRANCIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/EUROPA_FRANCIA.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_CUBA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_CUBA.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_MADAGASCAR.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_MADAGASCAR.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_ESTADOSUNIDOS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_ESTADOSUNIDOS.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_MARRUECOS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_MARRUECOS.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_INDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_INDIA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_TAILANDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_TAILANDIA.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_ETIOPIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_ETIOPIA.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_NIGERIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_NIGERIA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_ISRAEL.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_ISRAEL.png
+#end
+
+#begin Sprites/Cards/territories/SURAMERICA_CHILE.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/SURAMERICA_CHILE.png
+#end
+
+#begin Sprites/Cards/territories/NORTEAMERICA_GROENLANDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/NORTEAMERICA_GROENLANDIA.png
+#end
+
+#begin Sprites/Cards/territories/ASIA_ARABIASAUDITA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/ASIA_ARABIASAUDITA.png
+#end
+
+#begin Sprites/Cards/territories/OCEANIA_FIYI.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/OCEANIA_FIYI.png
+#end
+
+#begin Sprites/Cards/territories/AFRICA_KENIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/territories/AFRICA_KENIA.png
+#end
+
+#begin Sprites/Cards/symbols/infanteria.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/symbols/infanteria.png
+#end
+
+#begin Sprites/Cards/symbols/artilleria.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/symbols/artilleria.png
+#end
+
+#begin Sprites/Cards/symbols/caballeria.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/symbols/caballeria.png
+#end
+
+#begin Sprites/Cards/jokers/comodinmega.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/jokers/comodinmega.png
+#end
+
+#begin Sprites/Cards/jokers/comodincompleto.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Cards/jokers/comodincompleto.png
+#end
+
+#begin Sprites/map_indice_conpuentes.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/map_indice_conpuentes.png
+#end
+
+#begin Sprites/Dice/Dice_4.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_4.png
+#end
+
+#begin Sprites/Dice/Dice_5.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_5.png
+#end
+
+#begin Sprites/Dice/Dice_6.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_6.png
+#end
+
+#begin Sprites/Dice/Dice_2.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_2.png
+#end
+
+#begin Sprites/Dice/Dice_3.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_3.png
+#end
+
+#begin Sprites/Dice/Dice_1.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_1.png
+#end
+
+#begin Sprites/Dice/Dice_F4.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_F4.png
+#end
+
+#begin Sprites/Dice/Dice_F3.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_F3.png
+#end
+
+#begin Sprites/Dice/Dice_F2.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_F2.png
+#end
+
+#begin Sprites/Dice/Dice_F1.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/Dice/Dice_F1.png
+#end
+
+#begin Sprites/map_naked_conpuentes.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/map_naked_conpuentes.png
+#end
+
+#begin Sprites/map_naked.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/map_naked.png
+#end
+
+#begin Sprites/map_marcado.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/map_marcado.png
+#end
+
+#begin Sprites/masks/EUROPA_ALEMANIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_ALEMANIA.png
+#end
+
+#begin Sprites/masks/AFRICA_SUDAFRICA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_SUDAFRICA.png
+#end
+
+#begin Sprites/masks/ASIA_INDONESIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_INDONESIA.png
+#end
+
+#begin Sprites/masks/SURAMERICA_PERU.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_PERU.png
+#end
+
+#begin Sprites/masks/SURAMERICA_URUGUAY.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_URUGUAY.png
+#end
+
+#begin Sprites/masks/EUROPA_NORUEGA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_NORUEGA.png
+#end
+
+#begin Sprites/masks/ASIA_TURQUIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_TURQUIA.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_MEXICO.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_MEXICO.png
+#end
+
+#begin Sprites/masks/OCEANIA_PAPUA_NUEVA_GUINEA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/OCEANIA_PAPUA_NUEVA_GUINEA.png
+#end
+
+#begin Sprites/masks/EUROPA_GRECIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_GRECIA.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_HAITI.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_HAITI.png
+#end
+
+#begin Sprites/masks/SURAMERICA_BRASIL.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_BRASIL.png
+#end
+
+#begin Sprites/masks/ASIA_JAPON.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_JAPON.png
+#end
+
+#begin Sprites/masks/SURAMERICA_ARGENTINA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_ARGENTINA.png
+#end
+
+#begin Sprites/masks/EUROPA_ESPANA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_ESPANA.png
+#end
+
+#begin Sprites/masks/OCEANIA_NUEVA_ZELANDA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/OCEANIA_NUEVA_ZELANDA.png
+#end
+
+#begin Sprites/masks/SURAMERICA_COLOMBIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_COLOMBIA.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_CANADA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_CANADA.png
+#end
+
+#begin Sprites/masks/AFRICA_EGIPTO.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_EGIPTO.png
+#end
+
+#begin Sprites/masks/ASIA_FILIPINAS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_FILIPINAS.png
+#end
+
+#begin Sprites/masks/ASIA_RUSIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_RUSIA.png
+#end
+
+#begin Sprites/masks/OCEANIA_AUSTRALIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/OCEANIA_AUSTRALIA.png
+#end
+
+#begin Sprites/masks/ASIA_CHINA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_CHINA.png
+#end
+
+#begin Sprites/masks/ASIA_IRAN.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_IRAN.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_GUATEMALA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_GUATEMALA.png
+#end
+
+#begin Sprites/masks/EUROPA_ITALIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_ITALIA.png
+#end
+
+#begin Sprites/masks/EUROPA_FRANCIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/EUROPA_FRANCIA.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_ESTADOS_UNIDOS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_ESTADOS_UNIDOS.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_CUBA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_CUBA.png
+#end
+
+#begin Sprites/masks/AFRICA_MADAGASCAR.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_MADAGASCAR.png
+#end
+
+#begin Sprites/masks/ASIA_ARABIA_SAUDITA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_ARABIA_SAUDITA.png
+#end
+
+#begin Sprites/masks/AFRICA_MARRUECOS.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_MARRUECOS.png
+#end
+
+#begin Sprites/masks/ASIA_INDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_INDIA.png
+#end
+
+#begin Sprites/masks/ASIA_TAILANDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_TAILANDIA.png
+#end
+
+#begin Sprites/masks/AFRICA_ETIOPIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_ETIOPIA.png
+#end
+
+#begin Sprites/masks/AFRICA_NIGERIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_NIGERIA.png
+#end
+
+#begin Sprites/masks/ASIA_ISRAEL.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_ISRAEL.png
+#end
+
+#begin Sprites/masks/SURAMERICA_CHILE.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/SURAMERICA_CHILE.png
+#end
+
+#begin Sprites/masks/NORTEAMERICA_GROENLANDIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/NORTEAMERICA_GROENLANDIA.png
+#end
+
+#begin Sprites/masks/ASIA_COREA_DEL_SUR.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/ASIA_COREA_DEL_SUR.png
+#end
+
+#begin Sprites/masks/OCEANIA_FIYI.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/OCEANIA_FIYI.png
+#end
+
+#begin Sprites/masks/AFRICA_KENIA.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/masks/AFRICA_KENIA.png
+#end
+
+#begin Data/territories.json
+/copy:Data/territories.json
+#end
+
+#begin Fonts/Default.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/build:Fonts/Default.spritefont
+#end
+
+#begin Audio/Music/music_menu.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Audio/Music/music_menu.wav
+#end
+#begin Audio/Music/music_game1.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Audio/Music/music_game1.wav
+#end
+#begin Audio/Music/music_game2.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Audio/Music/music_game2.wav
+#end
+#begin Audio/Music/music_game3.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Audio/Music/music_game3.wav
+#end
+#begin Sprites/avatars/perso1.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso1.png
+#end
+#begin Sprites/avatars/perso2.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso2.png
+#end
+#begin Sprites/avatars/perso3.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso3.png
+#end
+#begin Sprites/avatars/perso4.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso4.png
+#end
+#begin Sprites/avatars/perso5.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso5.png
+#end
+#begin Sprites/avatars/perso6.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/build:Sprites/avatars/perso6.png
+#end
