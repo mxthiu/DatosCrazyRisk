@@ -8,50 +8,103 @@ using System.Reflection;
 
 namespace CrazyRisk.Core
 {
-    // ========================= Map helpers por reflexión =========================
-    // Permite leer Map.Territories, Territory.Id/id y Territory.Neighbors/neighbors
+    // ========================= Map helpers por reflexión (propiedades y CAMPOS) =========================
+    // Permite leer Map.Territories (propiedad o campo), Territory.id/Id y Territory.neighbors/Neighbors
     // sin acoplarse al tipo concreto que tengas en Map.cs
     internal static class MapExtensions
     {
         // Devuelve la lista de "objetos territorio" crudos (del array/lista Map.Territories)
         public static IEnumerable<object> GetRawTerritories(this Map map)
         {
-            // Se asume que Map tiene una propiedad pública "Territories"
-            var p = map.GetType().GetProperty("Territories", BindingFlags.Public | BindingFlags.Instance);
-            if (p == null) yield break;
+            var tp = map.GetType();
 
-            var value = p.GetValue(map);
-            if (value is System.Collections.IEnumerable en)
+            // 1) Propiedad "Territories"
+            var p = tp.GetProperty("Territories", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p != null)
             {
-                foreach (var t in en)
-                    if (t != null) yield return t;
+                var value = p.GetValue(map);
+                if (value is System.Collections.IEnumerable en)
+                {
+                    foreach (var t in en) if (t != null) yield return t;
+                    yield break;
+                }
+            }
+
+            // 2) Campo "Territories"
+            var f = tp.GetField("Territories", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (f != null)
+            {
+                var value = f.GetValue(map);
+                if (value is System.Collections.IEnumerable en)
+                {
+                    foreach (var t in en) if (t != null) yield return t;
+                    yield break;
+                }
             }
         }
 
+        // Intenta leer id desde propiedad o campo (case-insensitive)
         public static string? TryGetId(object territory)
         {
-            // Busca "id" o "Id"
             var tp = territory.GetType();
+
+            // Propiedad id/Id
             var pid = tp.GetProperty("id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
-                   ?? tp.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance);
-            return pid?.GetValue(territory) as string;
+                    ?? tp.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (pid != null)
+            {
+                var v = pid.GetValue(territory);
+                if (v is string s && !string.IsNullOrWhiteSpace(s)) return s;
+            }
+
+            // Campo id/Id
+            var fid = tp.GetField("id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? tp.GetField("Id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (fid != null)
+            {
+                var v = fid.GetValue(territory);
+                if (v is string s && !string.IsNullOrWhiteSpace(s)) return s;
+            }
+
+            return null;
         }
 
+        // Intenta leer neighbors desde propiedad o campo (listas/arrays de string)
         public static IEnumerable<string> TryGetNeighbors(object territory)
         {
-            // Busca "neighbors" o "Neighbors"
             var tp = territory.GetType();
-            var pn = tp.GetProperty("neighbors", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
-                    ?? tp.GetProperty("Neighbors", BindingFlags.Public | BindingFlags.Instance);
-            if (pn == null) yield break;
 
-            var val = pn.GetValue(territory);
+            // Propiedad neighbors/Neighbors
+            var pn = tp.GetProperty("neighbors", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? tp.GetProperty("Neighbors", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (pn != null)
+            {
+                foreach (var s in EnumerateStrings(pn.GetValue(territory))) yield return s;
+                yield break;
+            }
+
+            // Campo neighbors/Neighbors
+            var fn = tp.GetField("neighbors", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? tp.GetField("Neighbors", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (fn != null)
+            {
+                foreach (var s in EnumerateStrings(fn.GetValue(territory))) yield return s;
+            }
+        }
+
+        private static IEnumerable<string> EnumerateStrings(object? val)
+        {
+            if (val is string[] arr)
+            {
+                for (int i = 0; i < arr.Length; i++)
+                    if (!string.IsNullOrWhiteSpace(arr[i])) yield return arr[i];
+                yield break;
+            }
+
             if (val is System.Collections.IEnumerable en)
             {
                 foreach (var x in en)
-                {
-                    if (x is string s) yield return s;
-                }
+                    if (x is string s && !string.IsNullOrWhiteSpace(s)) yield return s;
             }
         }
 
@@ -139,7 +192,8 @@ namespace CrazyRisk.Core
         public Phase Phase { get; set; } = Phase.Reinforcement;
         public int CurrentPlayerId { get; set; }
         public int ReinforcementsRemaining { get; set; }
-        public Dictionary<string, TerritoryState> Territories { get; set; } = new Dictionary<string, TerritoryState>(StringComparer.Ordinal);
+        public Dictionary<string, TerritoryState> Territories { get; set; } =
+            new Dictionary<string, TerritoryState>(StringComparer.Ordinal);
         public List<PlayerInfo> Players { get; set; } = new();
         public string? PendingAttackFrom { get; set; }
         public string? PendingAttackTo { get; set; }
@@ -167,7 +221,7 @@ namespace CrazyRisk.Core
 
             State.Players = new List<PlayerInfo>(players);
 
-            // Recolecta ids de territorios desde Map (con reflexión)
+            // Recolecta ids de territorios desde Map (con reflexión, ahora soporta propiedades y campos)
             var terrIds = Map.GetTerritoryIds().ToList();
             if (terrIds.Count == 0)
                 throw new InvalidOperationException("El mapa no contiene territorios legibles (Id/id).");

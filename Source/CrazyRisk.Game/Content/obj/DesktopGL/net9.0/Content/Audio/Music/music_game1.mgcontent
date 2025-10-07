@@ -3,7 +3,7 @@
   <SourceFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Audio/Music/music_game1.wav</SourceFile>
   <SourceTime>2025-10-01T22:41:13.6260172-07:00</SourceTime>
   <DestFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/bin/DesktopGL/Content/Audio/Music/music_game1.xnb</DestFile>
-  <DestTime>2025-10-01T23:17:00.7723573-07:00</DestTime>
+  <DestTime>2025-10-02T19:55:17.2187806-07:00</DestTime>
   <Importer>WavImporter</Importer>
   <ImporterTime>2025-06-02T03:31:02-07:00</ImporterTime>
   <Processor>SoundEffectProcessor</Processor>

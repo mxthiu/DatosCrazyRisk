@@ -9,6 +9,14 @@ using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Audio;
 using CrazyRisk.Core;
 
+// === Integraciones ===
+using CrazyRiskGame.Play.Adapters;
+using CrazyRiskGame.Game.Services;
+using CrazyRiskGame.Play.Controllers;
+using CrazyRiskGame.Play.Animations;
+// Si quieres acoplar los renderers en un siguiente paso, importamos el namespace, pero hoy no los invocamos:
+using CrazyRiskGame.Play.UI;
+
 namespace CrazyRiskGame
 {
     public class Juego : Microsoft.Xna.Framework.Game
@@ -16,31 +24,36 @@ namespace CrazyRiskGame
         private GraphicsDeviceManager graficos;
         private SpriteBatch spriteBatch = null!;
 
-        // ====== Configuración general ======
-        private const float MAP_SCALE = 2.35f; // un poco menor para ayudar a mostrar Oceanía
-        private const float MAP_SHIFT_WHEN_SIDE = 0.28f; // porcentaje de side ancho que “descubre” Oceania
+        // ====== Tamaño / Layout general ======
+        private const float MAP_SCALE = 2.0f;
+        private const int UI_MARGIN_LEFT  = 20;
+        private const int UI_MARGIN_RIGHT = 420;
+        private const int UI_TOP_BAR      = 72;
+        private const int UI_BOTTOM_BAR   = 72;
 
         private enum AppState { MenuPrincipal, MenuOpciones, MenuJugar, MenuPersonajes, EnJuego }
         private AppState estado = AppState.MenuPrincipal;
 
-        // ====== UI/Assets generales ======
+        // ====== Assets ======
         private Texture2D? menuBg;
         private SpriteFont? font;
         private Texture2D pixel = null!;
+        private Texture2D mapaVisible = null!;
 
+        // ====== Botones ======
         private struct Button { public Rectangle Bounds; public string Text; public bool Hover; }
         private readonly List<Button> botonesMenu = new();
         private readonly List<Button> botonesOpciones = new();
         private readonly List<Button> botonesJugar = new();
         private readonly List<Button> botonesPersonajes = new();
 
-        // ====== Avatares (selección) ======
+        // ====== Selección de avatares ======
         private readonly List<Texture2D> avatarTex = new();
         private readonly List<Rectangle> avatarRects = new();
         private int selectedAvatarIndex = -1;
         private readonly Dictionary<int, int> avatarIndexByPlayer = new();
 
-        // ====== Audio como SoundEffect ======
+        // ====== Audio ======
         private SoundEffect? musicMenuFx;
         private readonly List<SoundEffect?> musicGameFx = new();
         private SoundEffectInstance? currentMusic;
@@ -56,10 +69,10 @@ namespace CrazyRiskGame
         }
         private Config cfg = new();
         private string ConfigPath => Path.Combine(AppContext.BaseDirectory, "config.json");
-        private readonly Random rng = new Random();
 
-        // ====== Mapa / máscaras ======
-        private Texture2D mapaVisible = null!;
+        private readonly Random rng = new();
+
+        // ====== Máscaras / Territorios ======
         private readonly Dictionary<string, Texture2D> maskPorId = new();
         private readonly Dictionary<string, Color[]> maskPixelsPorId = new();
         private readonly Dictionary<string, int> idToIndex = new();
@@ -68,11 +81,10 @@ namespace CrazyRiskGame
         private bool[,] adj = new bool[1,1];
 
         private string? territorioHover = null;
-        private string? ultimoLogHover = null;
         private string? territorioSeleccionado = null;
+        private string? ultimoLogHover = null;
 
         private KeyboardState prevKb;
-        private MouseState prevMouse;
         private Map? mapaCore = null;
 
         private static readonly string[] IDS_TERRITORIOS = new[]
@@ -85,50 +97,66 @@ namespace CrazyRiskGame
             "OCEANIA_AUSTRALIA","OCEANIA_NUEVA_ZELANDA","OCEANIA_PAPUA_NUEVA_GUINEA","OCEANIA_FIYI"
         };
 
-        // ====== Lógica base (dummy) ======
-        private readonly List<Player> players = new()
+        // ====== Core (GameEngine) ======
+        private GameEngine? engine;
+        private readonly List<PlayerInfo> players = new()
         {
-            new Player(0, "Azul", Color.CornflowerBlue),
-            new Player(1, "Rojo", new Color(220,60,60))
+            new PlayerInfo(0, "Azul"),
+            new PlayerInfo(1, "Rojo"),
+            new PlayerInfo(2, "Verde"),
         };
-        private WorldState world = null!;
+        private readonly List<string> uiLog = new(64);
 
-        // ====== UI EnJuego Provisional ======
+        // ====== Adapters / Services / Controllers / Animations ======
+        private EngineAdapter? engineAdapter;
+        private EngineActionsAdapter? actionsAdapter;
+        private InputAdapter? input;
+
+        private ReinforcementService? reinforcementService;
+        private FortifyService? fortifyService;
+        private AttackService? attackService;               // si no existe en tu árbol, no se usa
+        private SelectionService? selectionService;
+        private TurnService? turnService;
+        private ContinentBonusService? continentBonusService;
+        private CardsService? cardsService;
+
+        private ReinforcementController? reinforcementController;
+        private FortifyController? fortifyController;
+        private MapSelectionController? mapSelectionController;
+        private AttackController? attackController;
+
+        private DiceAnimator? diceAnimator;
+
+        // ====== UI EnJuego ======
         private enum SideTab { Refuerzos, Ataque, Movimiento, Cartas, Log }
         private SideTab sideTab = SideTab.Refuerzos;
         private bool sideCollapsed = false;
 
-        private Rectangle hudTopRect;      // Barra superior
-        private Rectangle sideRect;        // Panel lateral
-        private Rectangle sideHeaderRect;  // Encabezado/tabs
-        private Rectangle bottomRect;      // Barra inferior
+        private Rectangle rectTop, rectSide, rectBottom, rectSideHeader, rectMapViewport;
 
         private readonly List<Button> sideTabButtons = new();
         private Button sideCollapseButton;
         private readonly List<Button> bottomButtons = new();
 
-        // tamaños relativos (compactados)
-        private const int HUD_TOP_H = 60;
-        private const int BOTTOM_H  = 60;
-        private int SIDE_W => sideCollapsed ? 24 : (int)(graficos.PreferredBackBufferWidth * 0.23f);
-        private const int SIDE_HEADER_H = 34;
-        private const int TAB_BUTTON_W = 92;
+        private const int SIDE_HEADER_H = 36;
+        private const int TAB_BUTTON_W = 96;
 
-        // ====== DADOS ======
+        // ====== Refuerzos UI ======
+        private int refuerzosStep = 1;
+        private int refuerzosPendientes => engine?.State.ReinforcementsRemaining ?? 0;
+
+        // ====== Ataque / Dados ======
         private Texture2D[] diceFaces = Array.Empty<Texture2D>();
         private enum DiceState { Idle, Rolling, Show }
         private DiceState diceState = DiceState.Idle;
         private double diceTimer = 0;
-        private const double DICE_ROLL_DURATION = 0.85; // segundos
-        private readonly int[] diceResult = new int[3]; // 3 dados atacante (placeholder)
-        private readonly int[] diceShown  = new int[3]; // lo que se muestra en animación
-        private Rectangle lastBtnRollRect; // botón cacheado para coherencia
+        private const double DICE_ROLL_DURATION = 0.8;
+        private readonly int[] diceShown = new int[3];
+        private readonly int[] diceShownDef = new int[2];
+        private DiceRollResult? lastRoll;
 
-        // ====== Layout de ataque ======
-        private struct AtaqueLayout
-        {
-            public Rectangle AttRect, DefRect, BtnRollRect, DiceStripRect, AutoCheckRect;
-        }
+        // ====== Movimiento ======
+        private int moveAmountSlider = 1;
 
         public Juego()
         {
@@ -160,7 +188,7 @@ namespace CrazyRiskGame
         {
             spriteBatch = new SpriteBatch(GraphicsDevice);
 
-            // Texturas base
+            // Texturas
             mapaVisible = Content.Load<Texture2D>("Sprites/map_marcado");
             try { menuBg = Content.Load<Texture2D>("Sprites/UI/menu_bg"); } catch { menuBg = null; }
             try { font = Content.Load<SpriteFont>("Fonts/Default"); } catch { font = null; }
@@ -168,15 +196,15 @@ namespace CrazyRiskGame
             pixel = new Texture2D(GraphicsDevice, 1, 1);
             pixel.SetData(new[] { Color.White });
 
-            // Resolución basada en mapa
-            graficos.PreferredBackBufferWidth  = (int)(mapaVisible.Width  * MAP_SCALE);
-            graficos.PreferredBackBufferHeight = (int)(mapaVisible.Height * MAP_SCALE);
-            graficos.ApplyChanges();
+            // Máscaras
+            maskPorId.Clear();
+            maskPixelsPorId.Clear();
+            idToIndex.Clear();
+            indexToId.Clear();
 
-            // Máscaras por territorio
             for (int i = 0; i < IDS_TERRITORIOS.Length; i++)
             {
-                var id = IDS_TERRITORIOS[i];
+                string id = IDS_TERRITORIOS[i];
                 idToIndex[id] = i;
                 indexToId.Add(id);
 
@@ -187,34 +215,53 @@ namespace CrazyRiskGame
                 tex.GetData(data);
                 maskPixelsPorId[id] = data;
             }
+
             ConstruirPropiedadYAdyacencias();
             CargarMapaCoreSiExiste();
 
-            // Música (SoundEffect)
+            // Ventana (mapa + bordes UI)
+            int mapW = (int)(mapaVisible.Width * MAP_SCALE);
+            int mapH = (int)(mapaVisible.Height * MAP_SCALE);
+
+            graficos.PreferredBackBufferWidth  = mapW + UI_MARGIN_LEFT + UI_MARGIN_RIGHT;
+            graficos.PreferredBackBufferHeight = mapH + UI_TOP_BAR + UI_BOTTOM_BAR;
+            graficos.ApplyChanges();
+
+            // Rects base
+            rectTop = new Rectangle(0, 0, graficos.PreferredBackBufferWidth, UI_TOP_BAR);
+            rectBottom = new Rectangle(0, graficos.PreferredBackBufferHeight - UI_BOTTOM_BAR, graficos.PreferredBackBufferWidth, UI_BOTTOM_BAR);
+            rectSide = new Rectangle(graficos.PreferredBackBufferWidth - UI_MARGIN_RIGHT, UI_TOP_BAR, UI_MARGIN_RIGHT, graficos.PreferredBackBufferHeight - UI_TOP_BAR - UI_BOTTOM_BAR);
+            rectSideHeader = new Rectangle(rectSide.X, rectSide.Y, rectSide.Width, SIDE_HEADER_H);
+            rectMapViewport = new Rectangle(UI_MARGIN_LEFT, UI_TOP_BAR, mapW, mapH);
+
+            // Botón colapsar lateral
+            sideCollapseButton = new Button
+            {
+                Bounds = new Rectangle(rectSide.X - 24, rectSide.Y + 8, 24, 28),
+                Text = "<",
+                Hover = false
+            };
+
+            // Tabs
+            RebuildSideTabs();
+
+            // Bottom buttons
+            bottomButtons.Clear();
+            string[] bb = { "Confirmar", "Deshacer", "Cancelar", "Siguiente" };
+            int bw = 160, bh = 44, gap = 12, startX = 12;
+            for (int i = 0; i < bb.Length; i++)
+            {
+                var r = new Rectangle(startX + i*(bw+gap), rectBottom.Y + (rectBottom.Height - bh)/2, bw, bh);
+                bottomButtons.Add(new Button { Bounds = r, Text = bb[i], Hover = false });
+            }
+
+            // Música
             try { musicMenuFx = Content.Load<SoundEffect>("Audio/Music/music_menu"); } catch { musicMenuFx = null; }
             musicGameFx.Clear();
             try { musicGameFx.Add(Content.Load<SoundEffect>("Audio/Music/music_game1")); } catch { musicGameFx.Add(null); }
             try { musicGameFx.Add(Content.Load<SoundEffect>("Audio/Music/music_game2")); } catch { musicGameFx.Add(null); }
             try { musicGameFx.Add(Content.Load<SoundEffect>("Audio/Music/music_game3")); } catch { musicGameFx.Add(null); }
 
-            // Avatares
-            avatarTex.Clear();
-            for (int i = 1; i <= 6; i++)
-            {
-                try { avatarTex.Add(Content.Load<Texture2D>($"Sprites/avatars/perso{i}")); }
-                catch { }
-            }
-
-            // DADOS - caras 1..6
-            var faces = new List<Texture2D>();
-            for (int i = 1; i <= 6; i++)
-            {
-                try { faces.Add(Content.Load<Texture2D>($"Sprites/Dice/Dice_{i}")); }
-                catch { }
-            }
-            diceFaces = faces.ToArray();
-
-            // Config
             CargarConfig();
             AplicarConfigVisual();
             if (!menuMusicStarted || currentMusic == null)
@@ -223,24 +270,36 @@ namespace CrazyRiskGame
                 menuMusicStarted = true;
             }
 
-            world = new WorldState(NeighborsOf);
-
-            // Menús fuera de juego
+            // Avatares
+            avatarTex.Clear();
+            for (int i = 1; i <= 6; i++)
+            {
+                try { avatarTex.Add(Content.Load<Texture2D>($"Sprites/avatars/perso{i}")); } catch { }
+            }
             RebuildMenus();
 
-            // Layout en juego (inicial)
-            RebuildInGameLayout();
+            // Dados (caras)
+            var faces = new List<Texture2D>();
+            for (int i = 1; i <= 6; i++)
+            {
+                try { faces.Add(Content.Load<Texture2D>($"Sprites/Dice/Dice_{i}")); } catch { }
+            }
+            diceFaces = faces.ToArray();
+
+            for (int i = 0; i < diceShown.Length; i++) diceShown[i] = 1;
+            for (int i = 0; i < diceShownDef.Length; i++) diceShownDef[i] = 1;
         }
 
-        // ===================== Config =====================
+        // ======== Config ========
         private void CargarConfig()
         {
             try
             {
                 if (File.Exists(ConfigPath))
                 {
-                    var json = JsonSerializer.Deserialize<Config>(File.ReadAllText(ConfigPath));
-                    if (json != null) cfg = json;
+                    var json = File.ReadAllText(ConfigPath);
+                    var c = JsonSerializer.Deserialize<Config>(json);
+                    if (c != null) cfg = c;
                 }
             }
             catch { cfg = new Config(); }
@@ -258,11 +317,9 @@ namespace CrazyRiskGame
             graficos.IsFullScreen = cfg.Fullscreen;
             graficos.ApplyChanges();
         }
-
         private void StopMusic()
         {
-            try { currentMusic?.Stop(); currentMusic?.Dispose(); }
-            catch { }
+            try { currentMusic?.Stop(); currentMusic?.Dispose(); } catch { }
             currentMusic = null;
         }
         private void PlayMusic(SoundEffect? fx)
@@ -289,45 +346,14 @@ namespace CrazyRiskGame
             }
             else
             {
-                var disponibles = new List<SoundEffect>();
-                foreach (var s in musicGameFx) if (s != null) disponibles.Add(s!);
-                if (disponibles.Count > 0) PlayMusic(disponibles[rng.Next(disponibles.Count)]);
+                var ds = new List<SoundEffect>();
+                foreach (var s in musicGameFx) if (s != null) ds.Add(s!);
+                if (ds.Count > 0) PlayMusic(ds[rng.Next(ds.Count)]);
                 else StopMusic();
             }
         }
-        private void CambiarEstado(AppState nuevo)
-        {
-            if (nuevo == AppState.EnJuego) AplicarConfigAudio(estadoActualEsMenu: false);
-            else
-            {
-                if (!menuMusicStarted || currentMusic == null)
-                {
-                    AplicarConfigAudio(estadoActualEsMenu: true);
-                    menuMusicStarted = true;
-                }
-            }
 
-            estado = nuevo;
-
-            if (estado == AppState.EnJuego)
-            {
-                world.Reset(indexToId);
-                world.QuickDistribute(indexToId, players, baseTroopsPerTerritory: 3);
-                territorioSeleccionado = null;
-
-                // UI en juego
-                sideTab = SideTab.Refuerzos;
-                sideCollapsed = false;
-                RebuildInGameLayout();
-
-                // reiniciar dados
-                diceState = DiceState.Idle;
-                diceTimer = 0;
-                for (int i = 0; i < diceShown.Length; i++) { diceShown[i] = 1; diceResult[i] = 1; }
-            }
-        }
-
-        // ===================== Menús fuera de juego =====================
+        // ======== Menús ========
         private void RebuildMenus()
         {
             botonesMenu.Clear();
@@ -336,139 +362,75 @@ namespace CrazyRiskGame
             botonesPersonajes.Clear();
             avatarRects.Clear();
 
-            int w = graficos.PreferredBackBufferWidth;
-            int h = graficos.PreferredBackBufferHeight;
+            int W = graficos.PreferredBackBufferWidth;
+            int H = graficos.PreferredBackBufferHeight;
 
-            int bw = (int)(w * 0.26f);
-            int bh = 44;
-            int cx = w / 2 - bw / 2;
-            int gap = 10;
-
-            // Principal
+            // Menú principal
+            int bw = (int)(W * 0.28f);
+            int bh = 46;
+            int cx = W / 2 - bw / 2;
+            int gap = 12;
             int totalH = bh * 3 + gap * 2;
-            int startY = h / 2 - totalH / 2;
+            int startY = H / 2 - totalH / 2;
+
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 0, bw, bh), Text = "Jugar" });
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 1, bw, bh), Text = "Opciones" });
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 2, bw, bh), Text = "Salir" });
 
             // Opciones
-            int oy = h / 2 - (bh * 5 + gap * 4) / 2;
+            int oy = H / 2 - (bh * 5 + gap * 4) / 2;
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 0, bw, bh), Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}" });
-            botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 1, bw, bh), Text = $"Música: {(cfg.MusicEnabled ? "ON" : "OFF")}" });
+            botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 1, bw, bh), Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}" });
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 2, (bw - gap) / 2, bh), Text = "Vol -" });
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx + (bw + gap) / 2, oy + (bh + gap) * 2, (bw - gap) / 2, bh), Text = "Vol +" });
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 3, bw, bh), Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}" });
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 4, bw, bh), Text = "Volver" });
 
             // Jugar
-            int jy = h / 2 - (bh * 2 + gap) / 2;
+            int jy = H / 2 - (bh * 2 + gap) / 2;
             botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 0, bw, bh), Text = "Partida rapida" });
             botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 1, bw, bh), Text = "Volver" });
 
-            // Selección de personajes (grid centrado 3x2)
+            // Personajes (grid 3x2)
             int cols = 3, rows = 2;
-            int cellW = (int)(w * 0.15f);
-            int cellH = (int)(h * 0.20f);
-            int gapX = (int)(w * 0.032f);
-            int gapY = (int)(h * 0.032f);
+            int cellW = (int)(W * 0.16f);
+            int cellH = (int)(H * 0.22f);
+            int gapX = (int)(W * 0.035f);
+            int gapY = (int)(H * 0.035f);
             int gridW = cols * cellW + (cols - 1) * gapX;
             int gridH = rows * cellH + (rows - 1) * gapY;
-            int gx = (w - gridW) / 2;
-            int gy = (int)(h * 0.2f);
-
+            int gx = (W - gridW) / 2;
+            int gy = (int)(H * 0.2f);
             for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
             {
-                for (int c = 0; c < cols; c++)
-                {
-                    int i = r * cols + c;
-                    if (i >= avatarTex.Count) break;
-                    var rect = new Rectangle(gx + c * (cellW + gapX), gy + r * (cellH + gapY), cellW, cellH);
-                    avatarRects.Add(rect);
-                }
+                int i = r * cols + c;
+                if (i >= avatarTex.Count) break;
+                var rect = new Rectangle(gx + c*(cellW+gapX), gy + r*(cellH+gapY), cellW, cellH);
+                avatarRects.Add(rect);
             }
-
-            int bw2 = (int)(w * 0.24f);
-            int baseY = gy + gridH + 26;
-            botonesPersonajes.Add(new Button { Bounds = new Rectangle(w / 2 - bw2 / 2, baseY, bw2, 54), Text = "Confirmar" });
-            botonesPersonajes.Add(new Button { Bounds = new Rectangle(w / 2 - bw2 / 2, baseY + 54 + 14, bw2, 54), Text = "Volver" });
+            int bw2 = (int)(W * 0.26f);
+            int baseY = gy + gridH + 30;
+            botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY, bw2, 56), Text = "Confirmar" });
+            botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY + 72, bw2, 56), Text = "Volver" });
         }
 
-        // ===================== Layout EnJuego =====================
-        private void RebuildInGameLayout()
+        private void RebuildSideTabs()
         {
-            int W = graficos.PreferredBackBufferWidth;
-            int H = graficos.PreferredBackBufferHeight;
-
-            hudTopRect = new Rectangle(0, 0, W, HUD_TOP_H);
-            bottomRect = new Rectangle(0, H - BOTTOM_H, W, BOTTOM_H);
-
-            int sideW = SIDE_W;
-            sideRect = new Rectangle(W - sideW, HUD_TOP_H, sideW, H - HUD_TOP_H - BOTTOM_H);
-            sideHeaderRect = new Rectangle(sideRect.X, sideRect.Y, sideRect.Width, SIDE_HEADER_H);
-
-            // Tabs & botones panel
             sideTabButtons.Clear();
             if (!sideCollapsed)
             {
                 string[] tabs = { "Refuerzos", "Ataque", "Movimiento", "Cartas", "Log" };
                 for (int i = 0; i < tabs.Length; i++)
                 {
-                    int x = sideRect.X + 6 + i * (TAB_BUTTON_W + 6);
-                    var r = new Rectangle(x, sideHeaderRect.Y + 4, TAB_BUTTON_W, sideHeaderRect.Height - 8);
+                    int x = rectSide.X + 8 + i * (TAB_BUTTON_W + 6);
+                    var r = new Rectangle(x, rectSideHeader.Y + 4, TAB_BUTTON_W, rectSideHeader.Height - 8);
                     sideTabButtons.Add(new Button { Bounds = r, Text = tabs[i], Hover = false });
                 }
             }
-
-            // Botón colapsar panel (a la izquierda del panel)
-            int colBtnW = 24;
-            sideCollapseButton = new Button
-            {
-                Bounds = new Rectangle(sideRect.X - colBtnW, sideRect.Y + 6, colBtnW, 26),
-                Text = sideCollapsed ? ">" : "<",
-                Hover = false
-            };
-
-            // Barra inferior: botones placeholder
-            bottomButtons.Clear();
-            int bw = 150, bh = 40, gap = 10;
-            int startX = 10;
-            string[] bb = { "Confirmar", "Deshacer", "Cancelar", "Terminar fase", "Menu" };
-            for (int i = 0; i < bb.Length; i++)
-            {
-                var r = new Rectangle(startX + i * (bw + gap), bottomRect.Y + (bottomRect.Height - bh) / 2, bw, bh);
-                bottomButtons.Add(new Button { Bounds = r, Text = bb[i], Hover = false });
-            }
         }
 
-        private AtaqueLayout GetAtaqueLayout()
-        {
-            var l = new AtaqueLayout();
-
-            // área principal del panel (contenido)
-            var content = new Rectangle(
-                sideRect.X + 8,
-                sideRect.Y + SIDE_HEADER_H + 8,
-                sideRect.Width - 16,
-                sideRect.Height - SIDE_HEADER_H - 16
-            );
-
-            // bloques compactos
-            l.AttRect = new Rectangle(content.X, content.Y, content.Width, 56);
-            l.DefRect = new Rectangle(content.X, l.AttRect.Bottom + 6, content.Width, 56);
-
-            // check (placeholder)
-            l.AutoCheckRect = new Rectangle(content.X, l.DefRect.Bottom + 8, 16, 16);
-
-            // botón lanzar
-            l.BtnRollRect = new Rectangle(content.X, l.DefRect.Bottom + 34, content.Width, 38);
-
-            // zona dados
-            l.DiceStripRect = new Rectangle(content.X, l.BtnRollRect.Bottom + 6, content.Width, 60);
-
-            return l;
-        }
-
-        // ===================== Mapa / Adyacencia =====================
+        // ======== Mapa / adyacencias ========
         private static bool EsGris(Color c)
         {
             const int DELTA_GRAY = 12;
@@ -510,22 +472,20 @@ namespace CrazyRiskGame
             int n = IDS_TERRITORIOS.Length;
             adj = new bool[n, n];
             for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
             {
-                for (int x = 0; x < w; x++)
-                {
-                    int a = ownerGrid[x, y];
-                    if (a < 0) continue;
+                int a = ownerGrid[x, y];
+                if (a < 0) continue;
 
-                    if (x + 1 < w)
-                    {
-                        int b = ownerGrid[x + 1, y];
-                        if (b >= 0 && b != a) { adj[a, b] = adj[b, a] = true; }
-                    }
-                    if (y + 1 < h)
-                    {
-                        int b = ownerGrid[x, y + 1];
-                        if (b >= 0 && b != a) { adj[a, b] = adj[b, a] = true; }
-                    }
+                if (x + 1 < w)
+                {
+                    int b = ownerGrid[x + 1, y];
+                    if (b >= 0 && b != a) { adj[a, b] = adj[b, a] = true; }
+                }
+                if (y + 1 < h)
+                {
+                    int b = ownerGrid[x, y + 1];
+                    if (b >= 0 && b != a) { adj[a, b] = adj[b, a] = true; }
                 }
             }
         }
@@ -556,15 +516,91 @@ namespace CrazyRiskGame
             }
         }
 
-        // ===================== Update =====================
+        // ======== Estado / Transiciones ========
+        private void CambiarEstado(AppState nuevo)
+        {
+            if (nuevo == AppState.EnJuego) AplicarConfigAudio(false);
+            else
+            {
+                if (!menuMusicStarted || currentMusic == null)
+                {
+                    AplicarConfigAudio(true);
+                    menuMusicStarted = true;
+                }
+            }
+
+            estado = nuevo;
+
+            if (estado == AppState.EnJuego)
+            {
+                // Cargar mapa lógico; si no existe el JSON, exportamos y recargamos
+                if (mapaCore == null)
+                {
+                    ExportarTerritoriesJson();
+                    CargarMapaCoreSiExiste();
+                }
+
+                if (mapaCore == null)
+                {
+                    uiLog.Add("No se pudo cargar el mapa de datos (Content/Data/territories.json).");
+                }
+                else
+                {
+                    // Motor y capa de integración
+                    engine = new GameEngine(mapaCore, players);
+
+                    engineAdapter = new EngineAdapter(engine);
+                    actionsAdapter = new EngineActionsAdapter(engine);
+                    input = new InputAdapter();
+
+                    // Servicios: pasan GameEngine
+                    selectionService       = new SelectionService(engine!);
+                    reinforcementService   = new ReinforcementService(engine!);
+                    fortifyService         = new FortifyService(engine!);
+                    try { attackService    = new AttackService(engine!); } catch { attackService = null; }
+                    turnService            = new TurnService(engine!);
+                    // (TEMP) deshabilitado: tu ctor real de ContinentBonusService pide defs, no el engine
+                    continentBonusService  = null;
+                    cardsService           = new CardsService();
+
+                    // Controllers (aunque no los usemos para colocar/mover ahora)
+                    reinforcementController = new ReinforcementController(engine!);
+                    fortifyController       = new FortifyController(engine!);
+                    mapSelectionController  = null;
+
+                    // Dados
+                    attackController        = new AttackController(engine!, selectionService, msg => uiLog.Add(msg));
+                    diceAnimator            = new DiceAnimator();
+
+                    uiLog.Clear();
+                    uiLog.Add("Comienza la partida. Fase: Refuerzos.");
+                }
+
+                territorioSeleccionado = null;
+                sideTab = SideTab.Refuerzos;
+                sideCollapsed = false;
+                RebuildSideTabs();
+
+                // Reset de dados
+                diceState = DiceState.Idle;
+                diceTimer = 0;
+                for (int i = 0; i < diceShown.Length; i++) diceShown[i] = 1;
+                for (int i = 0; i < diceShownDef.Length; i++) diceShownDef[i] = 1;
+                lastRoll = null;
+            }
+        }
+
+        // ======== Update ========
         protected override void Update(GameTime gameTime)
         {
             var kb = Keyboard.GetState();
             var mouse = Mouse.GetState();
             var pos = new Point(mouse.X, mouse.Y);
 
-            bool clickLeft = prevMouse.LeftButton == ButtonState.Released && mouse.LeftButton == ButtonState.Pressed;
+            // Captura de input (adapter)
+            input?.Capture();
 
+            // Esc para atrás
             if (kb.IsKeyDown(Keys.Escape))
             {
                 switch (estado)
@@ -572,173 +608,33 @@ namespace CrazyRiskGame
                     case AppState.MenuOpciones:
                     case AppState.MenuJugar:
                     case AppState.MenuPersonajes:
-                        CambiarEstado(AppState.MenuPrincipal); break;
+                        CambiarEstado(AppState.MenuPrincipal);
+                        break;
                     case AppState.EnJuego:
-                        CambiarEstado(AppState.MenuPrincipal); break;
+                        CambiarEstado(AppState.MenuPrincipal);
+                        break;
                     case AppState.MenuPrincipal:
-                        Exit(); break;
+                        Exit();
+                        break;
                 }
             }
 
-            // ===== Menús fuera de juego =====
             if (estado != AppState.EnJuego)
             {
-                if (estado == AppState.MenuOpciones || estado == AppState.MenuJugar || estado == AppState.MenuPrincipal)
-                {
-                    var lista = estado switch
-                    {
-                        AppState.MenuOpciones => botonesOpciones,
-                        AppState.MenuJugar => botonesJugar,
-                        _ => botonesMenu
-                    };
-
-                    for (int i = 0; i < lista.Count; i++)
-                    {
-                        var b = lista[i];
-                        b.Hover = b.Bounds.Contains(pos);
-                        if (estado == AppState.MenuOpciones) botonesOpciones[i] = b;
-                        else if (estado == AppState.MenuJugar) botonesJugar[i] = b;
-                        else botonesMenu[i] = b;
-                    }
-
-                    if (clickLeft)
-                    {
-                        if (estado == AppState.MenuPrincipal)
-                        {
-                            if (botonesMenu[0].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuJugar); }
-                            else if (botonesMenu[1].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuOpciones); }
-                            else if (botonesMenu[2].Bounds.Contains(pos)) { Exit(); }
-                        }
-                        else if (estado == AppState.MenuOpciones)
-                        {
-                            if (botonesOpciones[0].Bounds.Contains(pos))
-                            { cfg.Fullscreen = !cfg.Fullscreen; AplicarConfigVisual(); RebuildMenus(); GuardarConfig(); }
-                            else if (botonesOpciones[1].Bounds.Contains(pos))
-                            { cfg.MusicEnabled = !cfg.MusicEnabled; if (!cfg.MusicEnabled) StopMusic(); else if (estado != AppState.EnJuego) AplicarConfigAudio(true); RebuildMenus(); GuardarConfig(); }
-                            else if (botonesOpciones[2].Bounds.Contains(pos))
-                            { cfg.MusicVolume = MathF.Max(0f, cfg.MusicVolume - 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
-                            else if (botonesOpciones[3].Bounds.Contains(pos))
-                            { cfg.MusicVolume = MathF.Min(1f, cfg.MusicVolume + 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
-                            else if (botonesOpciones[4].Bounds.Contains(pos))
-                            { cfg.SfxEnabled = !cfg.SfxEnabled; RebuildMenus(); GuardarConfig(); }
-                            else if (botonesOpciones[5].Bounds.Contains(pos))
-                            { CambiarEstado(AppState.MenuPrincipal); }
-
-                            // refrescar textos
-                            var b0 = botonesOpciones[0]; b0.Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}"; botonesOpciones[0] = b0;
-                            var b1 = botonesOpciones[1]; b1.Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}"; botonesOpciones[1] = b1;
-                            var b4 = botonesOpciones[4]; b4.Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}"; botonesOpciones[4] = b4;
-                        }
-                        else if (estado == AppState.MenuJugar)
-                        {
-                            if (botonesJugar[0].Bounds.Contains(pos))
-                            {
-                                selectedAvatarIndex = -1;
-                                CambiarEstado(AppState.MenuPersonajes);
-                            }
-                            else if (botonesJugar[1].Bounds.Contains(pos))
-                            {
-                                CambiarEstado(AppState.MenuPrincipal);
-                            }
-                        }
-                    }
-
-                    prevKb = kb;
-                    prevMouse = mouse;
-                    base.Update(gameTime);
-                    return;
-                }
-
-                // Selección de Personajes
-                if (estado == AppState.MenuPersonajes)
-                {
-                    for (int i = 0; i < botonesPersonajes.Count; i++)
-                    {
-                        var b = botonesPersonajes[i];
-                        b.Hover = b.Bounds.Contains(pos);
-                        botonesPersonajes[i] = b;
-                    }
-
-                    if (clickLeft)
-                    {
-                        for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
-                            if (avatarRects[i].Contains(pos)) { selectedAvatarIndex = i; break; }
-
-                        if (botonesPersonajes[0].Bounds.Contains(pos))
-                        {
-                            if (selectedAvatarIndex >= 0)
-                            {
-                                avatarIndexByPlayer[0] = selectedAvatarIndex;
-                                CambiarEstado(AppState.EnJuego);
-                            }
-                            else Console.WriteLine("[UI] Debes elegir un avatar.");
-                        }
-                        else if (botonesPersonajes[1].Bounds.Contains(pos))
-                        {
-                            CambiarEstado(AppState.MenuJugar);
-                        }
-                    }
-
-                    prevKb = kb;
-                    prevMouse = mouse;
-                    base.Update(gameTime);
-                    return;
-                }
+                UpdateMenus(kb, mouse, pos);
+                prevKb = kb;
+                base.Update(gameTime);
+                return;
             }
 
             // ===== En Juego =====
-            var mouseState = mouse;
-            int mx = (int)((mouseState.X - MapDrawOffsetX()) / MAP_SCALE);
-            int my = (int)((mouseState.Y - MapDrawOffsetY()) / MAP_SCALE);
-
-            // Si el click cae sobre UI lateral o barras, no interactuamos con mapa
-            bool sobreUI = hudTopRect.Contains(new Point(mouseState.X, mouseState.Y))
-                           || bottomRect.Contains(new Point(mouseState.X, mouseState.Y))
-                           || sideRect.Contains(new Point(mouseState.X, mouseState.Y))
-                           || sideCollapseButton.Bounds.Contains(new Point(mouseState.X, mouseState.Y));
-
-            if (!sobreUI)
-            {
-                territorioHover = DetectarTerritorioPorGris(mx, my);
-                if (territorioHover != ultimoLogHover)
-                {
-                    Console.WriteLine(territorioHover ?? "SinTerritorio");
-                    ultimoLogHover = territorioHover;
-                }
-
-                if (clickLeft)
-                {
-                    if (territorioSeleccionado == null)
-                    {
-                        territorioSeleccionado = territorioHover;
-                    }
-                    else if (territorioHover != null && territorioHover != territorioSeleccionado)
-                    {
-                        // Placeholder: futura lógica
-                        territorioSeleccionado = territorioHover;
-                    }
-                }
-
-                if (mouseState.RightButton == ButtonState.Pressed || (kb.IsKeyDown(Keys.Back) && prevKb.IsKeyUp(Keys.Back)))
-                    territorioSeleccionado = null;
-            }
-
-            // Atajo export JSON
-            if (kb.IsKeyDown(Keys.J) && !prevKb.IsKeyDown(Keys.J))
-            {
-                ExportarTerritoriesJson();
-                CargarMapaCoreSiExiste();
-            }
-
-            // ----- UI lateral: hover & clicks -----
-            var scb = sideCollapseButton;
-            scb.Hover = sideCollapseButton.Bounds.Contains(new Point(mouseState.X, mouseState.Y));
-            sideCollapseButton = scb;
-            if (clickLeft && sideCollapseButton.Bounds.Contains(new Point(mouseState.X, mouseState.Y)))
+            // Clicks sobre panel lateral
+            sideCollapseButton.Hover = sideCollapseButton.Bounds.Contains(pos);
+            if (mouse.LeftButton == ButtonState.Pressed && sideCollapseButton.Bounds.Contains(pos))
             {
                 sideCollapsed = !sideCollapsed;
                 sideCollapseButton.Text = sideCollapsed ? ">" : "<";
-                RebuildInGameLayout();
+                RebuildSideTabs();
             }
 
             if (!sideCollapsed)
@@ -746,94 +642,273 @@ namespace CrazyRiskGame
                 for (int i = 0; i < sideTabButtons.Count; i++)
                 {
                     var b = sideTabButtons[i];
-                    b.Hover = b.Bounds.Contains(new Point(mouseState.X, mouseState.Y));
+                    b.Hover = b.Bounds.Contains(pos);
                     sideTabButtons[i] = b;
 
-                    if (clickLeft && b.Bounds.Contains(new Point(mouseState.X, mouseState.Y)))
-                    {
+                    if (mouse.LeftButton == ButtonState.Pressed && b.Bounds.Contains(pos))
                         sideTab = (SideTab)i;
-                    }
                 }
             }
 
+            // Bottom bar
             for (int i = 0; i < bottomButtons.Count; i++)
             {
                 var b = bottomButtons[i];
-                b.Hover = b.Bounds.Contains(new Point(mouseState.X, mouseState.Y));
+                b.Hover = b.Bounds.Contains(pos);
                 bottomButtons[i] = b;
 
-                if (clickLeft && b.Bounds.Contains(new Point(mouseState.X, mouseState.Y)))
-                {
-                    Console.WriteLine($"[UI] Click '{b.Text}' (sin acción)");
-                }
+                if (mouse.LeftButton == ButtonState.Pressed && b.Bounds.Contains(pos))
+                    OnBottomButtonClick(b.Text);
             }
 
-            // --- Click en "Lanzar dados" cuando la pestaña es Ataque ---
-            if (estado == AppState.EnJuego && sideTab == SideTab.Ataque)
+            // Export data J
+            if (kb.IsKeyDown(Keys.J) && !prevKb.IsKeyDown(Keys.J))
             {
-                var L = GetAtaqueLayout();
-                lastBtnRollRect = L.BtnRollRect;
+                ExportarTerritoriesJson();
+                CargarMapaCoreSiExiste();
+            }
 
-                if (clickLeft && L.BtnRollRect.Contains(new Point(mouse.X, mouse.Y)))
+            // Interacción con el mapa solo dentro del rectMapViewport
+            bool sobreMapa = rectMapViewport.Contains(pos);
+            if (sobreMapa)
+            {
+                // Convertir a coords de textura
+                int mx = (int)((mouse.X - rectMapViewport.X) / MAP_SCALE);
+                int my = (int)((mouse.Y - rectMapViewport.Y) / MAP_SCALE);
+
+                territorioHover = DetectarTerritorioPorGris(mx, my);
+                if (territorioHover != ultimoLogHover)
                 {
-                    if (diceFaces.Length >= 6)
-                    {
-                        diceState = DiceState.Rolling;
-                        diceTimer = 0;
-                        for (int i2 = 0; i2 < diceResult.Length; i2++)
-                        {
-                            diceResult[i2] = rng.Next(1, 7);
-                            diceShown[i2]  = rng.Next(1, 7);
-                        }
-                    }
+                    Console.WriteLine(territorioHover ?? "SinTerritorio");
+                    ultimoLogHover = territorioHover;
+                }
+
+                if (mouse.LeftButton == ButtonState.Pressed)
+                    OnMapLeftClick(mx, my);
+                if (mouse.RightButton == ButtonState.Pressed)
+                {
+                    territorioSeleccionado = null;
+                    // attackController?.ClearSelection();
                 }
             }
 
-            // Avance de animación de dados
+            // Animación de dados (si decides usar DiceAnimator más adelante)
+            diceAnimator?.Update(gameTime);
+
+            // Animación de dados (actual)
             if (diceState == DiceState.Rolling)
             {
                 diceTimer += gameTime.ElapsedGameTime.TotalSeconds;
-
                 if (diceTimer < DICE_ROLL_DURATION)
                 {
-                    // Cambios rápidos de caras (cada ~70ms)
-                    if (diceTimer - _lastDiceFlipTime >= 0.07)
+                    if (gameTime.TotalGameTime.Milliseconds % 60 < 20)
                     {
-                        _lastDiceFlipTime = diceTimer;
-                        for (int i = 0; i < diceShown.Length; i++)
-                            diceShown[i] = rng.Next(1, 7);
+                        for (int i = 0; i < diceShown.Length; i++) diceShown[i] = rng.Next(1, 7);
+                        for (int i = 0; i < diceShownDef.Length; i++) diceShownDef[i] = rng.Next(1, 7);
                     }
                 }
                 else
                 {
-                    for (int i = 0; i < diceShown.Length; i++)
-                        diceShown[i] = diceResult[i];
                     diceState = DiceState.Show;
+                    if (lastRoll != null)
+                    {
+                        // Mostrar caras finales
+                        for (int i = 0; i < diceShown.Length; i++)
+                            diceShown[i] = i < lastRoll.AttackerDice.Length ? lastRoll.AttackerDice[i] : 1;
+                        for (int i = 0; i < diceShownDef.Length; i++)
+                            diceShownDef[i] = i < lastRoll.DefenderDice.Length ? lastRoll.DefenderDice[i] : 1;
+                    }
                 }
             }
 
             prevKb = kb;
-            prevMouse = mouse;
             base.Update(gameTime);
         }
-        private double _lastDiceFlipTime = 0;
 
-        private float MapDrawOffsetX()
+        private void UpdateMenus(KeyboardState kb, MouseState mouse, Point pos)
         {
-            // corre el mapa un poco a la izquierda cuando el panel está abierto para ganar espacio en el este (Oceanía)
-            if (!sideCollapsed)
+            var lista = estado switch
             {
-                float maxShift = (SIDE_W * MAP_SHIFT_WHEN_SIDE);
-                return -maxShift;
-            }
-            return 0f;
-        }
-        private float MapDrawOffsetY() => 0f;
+                AppState.MenuOpciones => botonesOpciones,
+                AppState.MenuJugar => botonesJugar,
+                AppState.MenuPersonajes => botonesPersonajes,
+                _ => botonesMenu
+            };
 
+            // Hover
+            if (estado != AppState.MenuPersonajes)
+            {
+                for (int i = 0; i < lista.Count; i++)
+                {
+                    var b = lista[i];
+                    b.Hover = b.Bounds.Contains(pos);
+                    if (estado == AppState.MenuOpciones) botonesOpciones[i] = b;
+                    else if (estado == AppState.MenuJugar) botonesJugar[i] = b;
+                    else botonesMenu[i] = b;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < botonesPersonajes.Count; i++)
+                {
+                    var b = botonesPersonajes[i];
+                    b.Hover = b.Bounds.Contains(pos);
+                    botonesPersonajes[i] = b;
+                }
+            }
+
+            // Clicks
+            if (mouse.LeftButton == ButtonState.Pressed)
+            {
+                if (estado == AppState.MenuPrincipal)
+                {
+                    if (botonesMenu[0].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuJugar); }
+                    else if (botonesMenu[1].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuOpciones); }
+                    else if (botonesMenu[2].Bounds.Contains(pos)) { Exit(); }
+                }
+                else if (estado == AppState.MenuOpciones)
+                {
+                    if (botonesOpciones[0].Bounds.Contains(pos))
+                    { cfg.Fullscreen = !cfg.Fullscreen; AplicarConfigVisual(); RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[1].Bounds.Contains(pos))
+                    { cfg.MusicEnabled = !cfg.MusicEnabled; if (!cfg.MusicEnabled) StopMusic(); else if (estado != AppState.EnJuego) AplicarConfigAudio(true); RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[2].Bounds.Contains(pos))
+                    { cfg.MusicVolume = MathF.Max(0f, cfg.MusicVolume - 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
+                    else if (botonesOpciones[3].Bounds.Contains(pos))
+                    { cfg.MusicVolume = MathF.Min(1f, cfg.MusicVolume + 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
+                    else if (botonesOpciones[4].Bounds.Contains(pos))
+                    { cfg.SfxEnabled = !cfg.SfxEnabled; RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[5].Bounds.Contains(pos))
+                    { CambiarEstado(AppState.MenuPrincipal); }
+
+                    // refrescar textos
+                    var b0 = botonesOpciones[0]; b0.Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}"; botonesOpciones[0] = b0;
+                    var b1 = botonesOpciones[1]; b1.Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}"; botonesOpciones[1] = b1;
+                    var b4 = botonesOpciones[4]; b4.Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}"; botonesOpciones[4] = b4;
+                }
+                else if (estado == AppState.MenuJugar)
+                {
+                    if (botonesJugar[0].Bounds.Contains(pos))
+                    { selectedAvatarIndex = -1; CambiarEstado(AppState.MenuPersonajes); }
+                    else if (botonesJugar[1].Bounds.Contains(pos))
+                    { CambiarEstado(AppState.MenuPrincipal); }
+                }
+                else if (estado == AppState.MenuPersonajes)
+                {
+                    for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
+                        if (avatarRects[i].Contains(pos)) { selectedAvatarIndex = i; break; }
+
+                    if (botonesPersonajes[0].Bounds.Contains(pos))
+                    {
+                        if (selectedAvatarIndex >= 0)
+                        {
+                            avatarIndexByPlayer[0] = selectedAvatarIndex;
+                            CambiarEstado(AppState.EnJuego);
+                        }
+                        else Console.WriteLine("[UI] Debes elegir un avatar.");
+                    }
+                    else if (botonesPersonajes[1].Bounds.Contains(pos))
+                    {
+                        CambiarEstado(AppState.MenuJugar);
+                    }
+                }
+            }
+        }
+
+        private void OnBottomButtonClick(string text)
+        {
+            if (engine == null) return;
+
+            switch (text)
+            {
+                case "Confirmar":
+                    uiLog.Add("Confirmar pulsado.");
+                    break;
+
+                case "Deshacer":
+                    uiLog.Add("Deshacer pulsado (sin pila de undo).");
+                    break;
+
+                case "Cancelar":
+                    territorioSeleccionado = null;
+                    // attackController?.ClearSelection();
+                    uiLog.Add("Cancelado.");
+                    diceState = DiceState.Idle;
+                    break;
+
+                case "Siguiente":
+                    engine!.NextPhaseOrTurn();
+                    uiLog.Add("Siguiente: " + engine.State.Phase.ToString());
+                    sideTab = engine.State.Phase switch
+                    {
+                        Phase.Reinforcement => SideTab.Refuerzos,
+                        Phase.Attack        => SideTab.Ataque,
+                        _                   => SideTab.Movimiento
+                    };
+                    break;
+            }
+        }
+
+        private void OnMapLeftClick(int mx, int my)
+        {
+            if (engine == null) return;
+
+            string? hit = DetectarTerritorioPorGris(mx, my);
+            if (hit == null) return;
+
+            switch (engine.State.Phase)
+            {
+                case Phase.Reinforcement:
+                    if (engine.State.Territories.TryGetValue(hit, out var t1) && t1.OwnerId == engine.State.CurrentPlayerId)
+                    {
+                        if (refuerzosPendientes > 0)
+                        {
+                            int place = Math.Min(refuerzosStep, refuerzosPendientes);
+                            uiLog.Add($"[SIM] Refuerzos: +{place} en {hit} (pendiente de lógica real).");
+                        }
+                        territorioSeleccionado = hit;
+                    }
+                    break;
+
+                case Phase.Attack:
+                {
+                    // Versión mínima sin SetAttacker/SetDefender: dejamos marcada la selección local
+                    territorioSeleccionado = hit;
+                    uiLog.Add("Seleccionado en Ataque: " + hit + " (pendiente de integrar selección atacante/defensor)");
+                    break;
+                }
+
+                case Phase.Fortify:
+                    // Primer click: origen propio; segundo: destino propio conectado
+                    if (territorioSeleccionado == null)
+                    {
+                        if (engine.State.Territories.TryGetValue(hit, out var from) && from.OwnerId == engine.State.CurrentPlayerId)
+                        {
+                            territorioSeleccionado = hit;
+                            uiLog.Add("Fortificar origen: " + hit);
+                        }
+                    }
+                    else
+                    {
+                        if (engine.State.Territories.TryGetValue(hit, out var to) && to.OwnerId == engine.State.CurrentPlayerId)
+                        {
+                            int move = Math.Max(1, moveAmountSlider);
+                            uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move}) (pendiente de lógica real).");
+                            territorioSeleccionado = null;
+                        }
+                        else
+                        {
+                            territorioSeleccionado = null;
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // ======== Detección territorio ========
         private string? DetectarTerritorioPorGris(int x, int y)
         {
-            if (x < 0 || y < 0 || x >= mapaVisible.Width || y >= mapaVisible.Height)
-                return null;
+            if (x < 0 || y < 0) return null;
 
             foreach (var id in IDS_TERRITORIOS)
             {
@@ -847,6 +922,7 @@ namespace CrazyRiskGame
             return null;
         }
 
+        // ======== Export ========
         private sealed class TerritoryDTO { public string id { get; set; } = ""; public string[] neighbors { get; set; } = Array.Empty<string>(); }
         private sealed class TerritoriesRootDTO { public TerritoryDTO[] territories { get; set; } = Array.Empty<TerritoryDTO>(); }
 
@@ -858,236 +934,103 @@ namespace CrazyRiskGame
                 var vecinos = new List<string>();
                 for (int b = 0; b < indexToId.Count; b++)
                     if (adj[a, b]) vecinos.Add(indexToId[b]);
-
                 list.Add(new TerritoryDTO { id = indexToId[a], neighbors = vecinos.ToArray() });
             }
 
             var root = new TerritoriesRootDTO { territories = list.ToArray() };
-
             string outDir = Path.Combine("Content", "Data");
             Directory.CreateDirectory(outDir);
             string outPath = Path.Combine(outDir, "territories.json");
-
             var json = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(outPath, json);
             Console.WriteLine("[OK] Exportado: " + outPath);
         }
 
-        // ===================== Draw =====================
+        // ======== Draw ========
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.Black);
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
-            // Menús fuera de juego
             if (estado != AppState.EnJuego)
             {
-                var bg = menuBg ?? mapaVisible;
-                var scale = ComputeScaleToFit(bg.Width, bg.Height, graficos.PreferredBackBufferWidth, graficos.PreferredBackBufferHeight);
-                var pos = new Vector2(
-                    (graficos.PreferredBackBufferWidth - bg.Width * scale) * 0.5f,
-                    (graficos.PreferredBackBufferHeight - bg.Height * scale) * 0.5f
-                );
-                spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-
-                var lista = estado switch
-                {
-                    AppState.MenuOpciones => botonesOpciones,
-                    AppState.MenuJugar => botonesJugar,
-                    AppState.MenuPersonajes => botonesPersonajes,
-                    _ => botonesMenu
-                };
-
-                // Pantalla de selección de personajes dibuja distinto
-                if (estado == AppState.MenuPersonajes)
-                {
-                    if (font != null)
-                    {
-                        string titulo = "Selecciona tu personaje";
-                        var size = font.MeasureString(titulo);
-                        spriteBatch.DrawString(font, titulo, new Vector2(
-                            (graficos.PreferredBackBufferWidth - size.X) * 0.5f,
-                            pos.Y + 12), Color.White);
-                    }
-
-                    for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
-                    {
-                        var rect = avatarRects[i];
-                        var tex = avatarTex[i];
-                        spriteBatch.Draw(pixel, rect, new Color(0, 0, 0, 120));
-                        DrawRect(rect, Color.White, 2);
-
-                        float sx = (float)rect.Width / tex.Width;
-                        float sy = (float)rect.Height / tex.Height;
-                        float sc = MathF.Min(sx, sy) * 0.92f;
-                        var drawSize = new Vector2(tex.Width * sc, tex.Height * sc);
-                        var posAv = new Vector2(rect.X + (rect.Width - drawSize.X) * 0.5f, rect.Y + (rect.Height - drawSize.Y) * 0.5f);
-                        spriteBatch.Draw(tex, posAv, null, Color.White, 0f, Vector2.Zero, sc, SpriteEffects.None, 0f);
-
-                        if (i == selectedAvatarIndex)
-                            DrawRect(new Rectangle(rect.X - 3, rect.Y - 3, rect.Width + 6, rect.Height + 6), new Color(0, 255, 0, 220), 3);
-                    }
-
-                    for (int i = 0; i < botonesPersonajes.Count; i++)
-                    {
-                        var b = botonesPersonajes[i];
-                        var bgc = b.Hover ? new Color(255,255,255,190) : new Color(255,255,255,140);
-                        spriteBatch.Draw(pixel, new Rectangle(b.Bounds.X + 3, b.Bounds.Y + 3, b.Bounds.Width, b.Bounds.Height), new Color(0, 0, 0, 80));
-                        spriteBatch.Draw(pixel, b.Bounds, bgc);
-                        DrawRect(b.Bounds, new Color(0, 0, 0, 180), 2);
-
-                        if (font != null)
-                        {
-                            var size = font.MeasureString(b.Text);
-                            var tx = b.Bounds.X + (b.Bounds.Width - size.X) * 0.5f;
-                            var ty = b.Bounds.Y + (b.Bounds.Height - size.Y) * 0.5f;
-                            spriteBatch.DrawString(font, b.Text, new Vector2(tx, ty), Color.Black);
-                        }
-                    }
-
-                    spriteBatch.End();
-                    base.Draw(gameTime);
-                    return;
-                }
-
-                // Botones Menú / Opciones / Jugar
-                for (int i = 0; i < lista.Count; i++)
-                {
-                    var b = lista[i];
-                    var bgc = b.Hover ? new Color(255,255,255,190) : new Color(255,255,255,140);
-                    spriteBatch.Draw(pixel, new Rectangle(b.Bounds.X + 3, b.Bounds.Y + 3, b.Bounds.Width, b.Bounds.Height), new Color(0, 0, 0, 80));
-                    spriteBatch.Draw(pixel, b.Bounds, bgc);
-                    DrawRect(b.Bounds, new Color(0, 0, 0, 180), 2);
-
-                    if (font != null)
-                    {
-                        var size = font.MeasureString(b.Text);
-                        var tx = b.Bounds.X + (b.Bounds.Width - size.X) * 0.5f;
-                        var ty = b.Bounds.Y + (b.Bounds.Height - size.Y) * 0.5f;
-                        spriteBatch.DrawString(font, b.Text, new Vector2(tx, ty), Color.Black);
-                    }
-                }
-
+                DrawMenus();
                 spriteBatch.End();
                 base.Draw(gameTime);
                 return;
             }
 
-            // ===== Dibujo En Juego =====
-            // 1) Mapa (con offset para descubrir Oceanía cuando panel abierto)
-            var mapOffset = new Vector2(MapDrawOffsetX(), MapDrawOffsetY());
-            spriteBatch.Draw(mapaVisible, mapOffset, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
+            // Fondo UI
+            spriteBatch.Draw(pixel, rectTop, new Color(15, 15, 18, 255));
+            spriteBatch.Draw(pixel, rectBottom, new Color(15, 15, 18, 255));
+            spriteBatch.Draw(pixel, rectSide, new Color(15, 15, 18, 225));
+            DrawRect(rectTop, new Color(255,255,255,40), 1);
+            DrawRect(rectBottom, new Color(255,255,255,40), 1);
+            DrawRect(rectSide, new Color(255,255,255,40), 1);
 
+            // Mapa
+            var mapPos = new Vector2(rectMapViewport.X, rectMapViewport.Y);
+            spriteBatch.Draw(mapaVisible, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
+
+            // Máscara hover / selección
             if (territorioSeleccionado != null && maskPorId.TryGetValue(territorioSeleccionado, out var selMask))
-                spriteBatch.Draw(selMask, mapOffset, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
-            else if (territorioHover != null && maskPorId.TryGetValue(territorioHover, out var hoverMask))
-                spriteBatch.Draw(hoverMask, mapOffset, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
+                spriteBatch.Draw(selMask, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
+            else if (territorioHover != null && maskPorId.TryGetValue(territorioHover, out var hovMask))
+                spriteBatch.Draw(hovMask, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
 
-            // 2) HUD superior
-            spriteBatch.Draw(pixel, hudTopRect, new Color(0, 0, 0, 150));
-            DrawRect(hudTopRect, new Color(255, 255, 255, 160), 2);
-
-            if (font != null)
+            // HUD superior: jugador y fase
+            if (font != null && engine != null)
             {
-                int active = 0;
-                string fase = sideTab switch
-                {
-                    SideTab.Refuerzos => "Fase: Refuerzos",
-                    SideTab.Ataque => "Fase: Ataque",
-                    SideTab.Movimiento => "Fase: Movimiento",
-                    _ => "Fase: Gestion"
-                };
+                string hud = $"Jugador: {engine.State.CurrentPlayerId}   Fase: {engine.State.Phase}";
+                spriteBatch.DrawString(font, hud, new Vector2(rectTop.X + 12, rectTop.Y + 12), Color.White);
 
-                // Avatar si existe
-                if (avatarIndexByPlayer.TryGetValue(0, out int avIdx) && avIdx >= 0 && avIdx < avatarTex.Count)
+                if (engine.State.Phase == Phase.Reinforcement)
                 {
-                    var av = avatarTex[avIdx];
-                    int avSize = hudTopRect.Height - 10;
-                    float sc = MathF.Min((float)avSize / av.Width, (float)avSize / av.Height);
-                    var posAv = new Vector2(hudTopRect.X + 8, hudTopRect.Y + 5);
-                    spriteBatch.Draw(av, posAv, null, Color.White, 0f, Vector2.Zero, sc, SpriteEffects.None, 0f);
-
-                    spriteBatch.DrawString(font, $"Jugador: {players[active].Name}", new Vector2(posAv.X + avSize + 8, hudTopRect.Y + 6), Color.White);
-                    spriteBatch.DrawString(font, fase, new Vector2(posAv.X + avSize + 8, hudTopRect.Y + 30), Color.White);
+                    string rf = $"Refuerzos: {engine.State.ReinforcementsRemaining}";
+                    spriteBatch.DrawString(font, rf, new Vector2(rectTop.Right - 12 - font.MeasureString(rf).X, rectTop.Y + 12), Color.White);
                 }
-                else
-                {
-                    spriteBatch.DrawString(font, $"Jugador: {players[active].Name}", new Vector2(hudTopRect.X + 8, hudTopRect.Y + 6), Color.White);
-                    spriteBatch.DrawString(font, fase, new Vector2(hudTopRect.X + 8, hudTopRect.Y + 30), Color.White);
-                }
-
-                // Acciones/ayuda breve al centro
-                string hint = sideTab switch
-                {
-                    SideTab.Refuerzos => "Coloca refuerzos en tus territorios",
-                    SideTab.Ataque => "Selecciona atacante y defensor adyacentes",
-                    SideTab.Movimiento => "Mueve tropas entre territorios conectados",
-                    SideTab.Cartas => "Gestiona sets y bonus",
-                    SideTab.Log => "Consulta historial de jugadas",
-                    _ => ""
-                };
-                var size = font.MeasureString(hint);
-                spriteBatch.DrawString(font, hint, new Vector2((graficos.PreferredBackBufferWidth - size.X) * 0.5f, hudTopRect.Y + (hudTopRect.Height - size.Y) * 0.5f), Color.White);
-
-                // Botón ayuda (placeholder)
-                string help = "[?] Ayuda";
-                var sh = font.MeasureString(help);
-                spriteBatch.DrawString(font, help, new Vector2(graficos.PreferredBackBufferWidth - sh.X - 10, hudTopRect.Y + 6), Color.White);
             }
 
-            // 3) Panel lateral derecho (colapsable)
-            // Botón colapsar (pestaña)
-            var tabCol = sideCollapseButton.Hover ? new Color(255,255,255,220) : new Color(255,255,255,180);
-            spriteBatch.Draw(pixel, sideCollapseButton.Bounds, tabCol);
+            // Panel lateral (pestaña y header)
+            sideCollapseButton.Bounds = new Rectangle(sideCollapsed ? rectSide.X - 24 : rectSide.X - 24, rectSide.Y + 8, 24, 28);
+            var colBg = sideCollapseButton.Hover ? new Color(255,255,255,220) : new Color(255,255,255,180);
+            spriteBatch.Draw(pixel, sideCollapseButton.Bounds, colBg);
             DrawRect(sideCollapseButton.Bounds, new Color(0,0,0,200), 2);
             if (font != null)
             {
                 var ts = font.MeasureString(sideCollapseButton.Text);
-                spriteBatch.DrawString(font,
-                    sideCollapseButton.Text,
+                spriteBatch.DrawString(font, sideCollapseButton.Text,
                     new Vector2(sideCollapseButton.Bounds.X + (sideCollapseButton.Bounds.Width - ts.X) * 0.5f,
                                 sideCollapseButton.Bounds.Y + (sideCollapseButton.Bounds.Height - ts.Y) * 0.5f),
                     Color.Black);
             }
 
-            // Cuerpo panel si está expandido
             if (!sideCollapsed)
             {
-                // cuerpo
-                spriteBatch.Draw(pixel, sideRect, new Color(0, 0, 0, 150));
-                DrawRect(sideRect, new Color(255, 255, 255, 160), 2);
+                // header tabs
+                spriteBatch.Draw(pixel, rectSideHeader, new Color(255,255,255,20));
+                DrawRect(rectSideHeader, new Color(255,255,255,60), 1);
 
-                // header
-                spriteBatch.Draw(pixel, sideHeaderRect, new Color(255, 255, 255, 30));
-                DrawRect(sideHeaderRect, new Color(255, 255, 255, 90), 1);
-
-                // tabs
                 for (int i = 0; i < sideTabButtons.Count; i++)
                 {
                     var b = sideTabButtons[i];
                     var active = (i == (int)sideTab);
-                    var bgc = active ? new Color(255,255,255,220) : (b.Hover ? new Color(255,255,255,180) : new Color(255,255,255,120));
-                    var fg  = Color.Black;
-
+                    var bgc = active ? new Color(255,255,255,220) : (b.Hover ? new Color(255,255,255,160) : new Color(255,255,255,110));
                     spriteBatch.Draw(pixel, b.Bounds, bgc);
                     DrawRect(b.Bounds, new Color(0,0,0,200), active ? 2 : 1);
-
                     if (font != null)
                     {
                         var s = font.MeasureString(b.Text);
-                        spriteBatch.DrawString(font, b.Text, new Vector2(b.Bounds.X + (b.Bounds.Width - s.X) * 0.5f, b.Bounds.Y + (b.Bounds.Height - s.Y) * 0.5f), fg);
+                        spriteBatch.DrawString(font, b.Text, new Vector2(b.Bounds.X + (b.Bounds.Width - s.X) * 0.5f, b.Bounds.Y + (b.Bounds.Height - s.Y) * 0.5f), Color.Black);
                     }
                 }
 
-                // contenido de pestaña
-                var content = new Rectangle(sideRect.X + 8, sideRect.Y + SIDE_HEADER_H + 8, sideRect.Width - 16, sideRect.Height - SIDE_HEADER_H - 16);
-                DrawSideTabContent(content);
+                // contenido
+                var content = new Rectangle(rectSide.X + 10, rectSide.Y + SIDE_HEADER_H + 10, rectSide.Width - 20, rectSide.Height - SIDE_HEADER_H - 20);
+                DrawSideContent(content);
             }
 
-            // 4) Barra inferior
-            spriteBatch.Draw(pixel, bottomRect, new Color(0, 0, 0, 150));
-            DrawRect(bottomRect, new Color(255, 255, 255, 160), 2);
-
+            // Bottom bar
             foreach (var b in bottomButtons)
             {
                 var bgc = b.Hover ? new Color(255,255,255,210) : new Color(255,255,255,160);
@@ -1102,147 +1045,340 @@ namespace CrazyRiskGame
                 }
             }
 
-            // 5) HUD info de selección al vuelo (pequeño overlay)
+            // Overlay info selección
             if (font != null)
             {
                 string sel = territorioSeleccionado ?? "(ninguno)";
                 string hov = territorioHover ?? "(ninguno)";
                 var measure = Math.Max(font.MeasureString(sel).X, font.MeasureString(hov).X);
-                var box = new Rectangle(10, bottomRect.Y - 52, (int)Math.Max(240, measure + 24), 44);
-                spriteBatch.Draw(pixel, box, new Color(0,0,0,120));
-                DrawRect(box, new Color(255,255,255,140), 2);
-                spriteBatch.DrawString(font, $"Sel: {sel}", new Vector2(box.X + 8, box.Y + 6), Color.White);
-                spriteBatch.DrawString(font, $"Hover: {hov}", new Vector2(box.X + 8, box.Y + 24), Color.White);
+                var box = new Rectangle(rectMapViewport.X, rectBottom.Y - 56, (int)Math.Max(280, measure + 28), 48);
+                spriteBatch.Draw(pixel, box, new Color(0,0,0,140));
+                DrawRect(box, new Color(255,255,255,120), 1);
+                spriteBatch.DrawString(font, $"Sel: {sel}", new Vector2(box.X + 10, box.Y + 8), Color.White);
+                spriteBatch.DrawString(font, $"Hover: {hov}", new Vector2(box.X + 10, box.Y + 26), Color.White);
             }
 
             spriteBatch.End();
             base.Draw(gameTime);
         }
 
-        // ---- Contenido provisional de pestañas ----
-        private void DrawSideTabContent(Rectangle area)
+        // ======== Side Content ========
+        private void DrawSideContent(Rectangle area)
         {
-            DrawRect(area, new Color(255,255,255,80), 1);
+            DrawRect(area, new Color(255,255,255,60), 1);
             if (font == null) return;
 
             switch (sideTab)
             {
                 case SideTab.Refuerzos:
                 {
-                    spriteBatch.DrawString(font, "REFUERZOS", new Vector2(area.X + 6, area.Y + 6), Color.White);
-                    var list = new Rectangle(area.X + 6, area.Y + 26, area.Width - 12, 140);
-                    spriteBatch.Draw(pixel, list, new Color(255,255,255,20));
-                    DrawRect(list, new Color(255,255,255,60), 1);
-                    spriteBatch.DrawString(font, "- Territorio A (Propio)", new Vector2(list.X + 8, list.Y + 6), Color.White);
-                    spriteBatch.DrawString(font, "- Territorio B (Propio)", new Vector2(list.X + 8, list.Y + 26), Color.White);
-                    spriteBatch.DrawString(font, "- ...", new Vector2(list.X + 8, list.Y + 46), Color.White);
+                    spriteBatch.DrawString(font, "Refuerzos", new Vector2(area.X + 6, area.Y + 6), Color.White);
 
-                    var row = new Rectangle(area.X + 6, list.Bottom + 6, area.Width - 12, 34);
-                    spriteBatch.Draw(pixel, row, new Color(255,255,255,20));
-                    DrawRect(row, new Color(255,255,255,60), 1);
-                    DrawUITextButton(new Rectangle(row.X + 6, row.Y + 3, 52, 28), "+1");
-                    DrawUITextButton(new Rectangle(row.X + 6 + 60, row.Y + 3, 52, 28), "+5");
-                    DrawUITextButton(new Rectangle(row.X + 6 + 120, row.Y + 3, 52, 28), "-1");
-                    DrawUITextButton(new Rectangle(row.X + 6 + 180, row.Y + 3, 52, 28), "-5");
+                    var r1 = new Rectangle(area.X + 6, area.Y + 32, area.Width - 12, 40);
+                    spriteBatch.Draw(pixel, r1, new Color(255,255,255,20));
+                    DrawRect(r1, new Color(255,255,255,60), 1);
+                    string rf = $"Pendientes: {refuerzosPendientes}";
+                    spriteBatch.DrawString(font, rf, new Vector2(r1.X + 8, r1.Y + 10), Color.White);
 
-                    DrawUIPrimaryButton(new Rectangle(area.X + 6, row.Bottom + 6, area.Width - 12, 38), "Colocar en territorio seleccionado");
-                    spriteBatch.DrawString(font, "Tropas disponibles: 0 (placeholder)", new Vector2(area.X + 6, row.Bottom + 48), Color.White);
+                    var btnMinus = new Rectangle(r1.Right - 160, r1.Y + 6, 36, 28);
+                    var btnPlus  = new Rectangle(r1.Right - 120, r1.Y + 6, 36, 28);
+                    var stepBox  = new Rectangle(r1.Right - 76, r1.Y + 6, 64, 28);
+                    DrawUITextButton(btnMinus, "-");
+                    DrawUITextButton(btnPlus , "+");
+                    spriteBatch.Draw(pixel, stepBox, new Color(255,255,255,100));
+                    DrawRect(stepBox, new Color(0,0,0,180), 1);
+                    var s = font!.MeasureString(refuerzosStep.ToString());
+                    spriteBatch.DrawString(font, refuerzosStep.ToString(),
+                        new Vector2(stepBox.X + (stepBox.Width - s.X)/2, stepBox.Y + (stepBox.Height - s.Y)/2), Color.Black);
+
+                    var mouse = Mouse.GetState();
+                    if (mouse.LeftButton == ButtonState.Pressed)
+                    {
+                        var p = new Point(mouse.X, mouse.Y);
+                        if (btnMinus.Contains(p)) refuerzosStep = Math.Max(1, refuerzosStep - 1);
+                        if (btnPlus.Contains(p))  refuerzosStep = Math.Min(20, refuerzosStep + 1);
+                    }
+
+                    var r2 = new Rectangle(area.X + 6, r1.Bottom + 10, area.Width - 12, 40);
+                    DrawUIPrimaryButton(r2, "Colocar en territorio seleccionado");
+                    if (Mouse.GetState().LeftButton == ButtonState.Pressed && r2.Contains(Mouse.GetState().Position))
+                    {
+                        if (territorioSeleccionado != null)
+                        {
+                            int place = Math.Min(refuerzosStep, refuerzosPendientes);
+                            if (place > 0)
+                                uiLog.Add($"[SIM] Botón: +{place} en {territorioSeleccionado} (pendiente de lógica real).");
+                            else
+                                uiLog.Add("[SIM] No hay refuerzos pendientes.");
+                        }
+                        else
+                        {
+                            uiLog.Add("[SIM] Selecciona un territorio primero.");
+                        }
+                    }
+
                     break;
                 }
+
                 case SideTab.Ataque:
                 {
-                    var L = GetAtaqueLayout();
+                    spriteBatch.DrawString(font, "Ataque", new Vector2(area.X + 6, area.Y + 6), Color.White);
 
-                    // ATT
-                    spriteBatch.Draw(pixel, L.AttRect, new Color(255,255,255,20));
-                    DrawRect(L.AttRect, new Color(255,255,255,60), 1);
-                    spriteBatch.DrawString(font, "Atacante: (selecciona en el mapa)", new Vector2(L.AttRect.X + 6, L.AttRect.Y + 4), Color.White);
-                    spriteBatch.DrawString(font, "Tropas: -- | Dueno: --", new Vector2(L.AttRect.X + 6, L.AttRect.Y + 26), Color.White);
+                    // Att/Def info
+                    var attBox = new Rectangle(area.X + 6, area.Y + 30, area.Width - 12, 54);
+                    var defBox = new Rectangle(area.X + 6, attBox.Bottom + 6, area.Width - 12, 54);
+                    spriteBatch.Draw(pixel, attBox, new Color(255,255,255,20));
+                    spriteBatch.Draw(pixel, defBox, new Color(255,255,255,20));
+                    DrawRect(attBox, new Color(255,255,255,60), 1);
+                    DrawRect(defBox, new Color(255,255,255,60), 1);
 
-                    // DEF
-                    spriteBatch.Draw(pixel, L.DefRect, new Color(255,255,255,20));
-                    DrawRect(L.DefRect, new Color(255,255,255,60), 1);
-                    spriteBatch.DrawString(font, "Defensor: (elige adyacente enemigo)", new Vector2(L.DefRect.X + 6, L.DefRect.Y + 4), Color.White);
-                    spriteBatch.DrawString(font, "Tropas: -- | Dueno: --", new Vector2(L.DefRect.X + 6, L.DefRect.Y + 26), Color.White);
+                    if (engine != null)
+                    {
+                        string att = engine.State.PendingAttackFrom ?? "(elige atacante)";
+                        string def = engine.State.PendingAttackTo   ?? "(elige defensor)";
+                        spriteBatch.DrawString(font, $"Atacante: {att}", new Vector2(attBox.X + 8, attBox.Y + 8), Color.White);
+                        spriteBatch.DrawString(font, $"Defensor : {def}", new Vector2(defBox.X + 8, defBox.Y + 8), Color.White);
+                    }
 
-                    // check auto (placeholder)
-                    DrawUICheck(L.AutoCheckRect, false, "Ataque automatico");
+                    // Botón lanzar
+                    var btn = new Rectangle(area.X + 6, defBox.Bottom + 10, area.Width - 12, 40);
+                    DrawUIPrimaryButton(btn, "Lanzar dados");
+                    if (Mouse.GetState().LeftButton == ButtonState.Pressed && btn.Contains(Mouse.GetState().Position))
+                    {
+                        TryRollDiceFromEngine(); // usa AttackController por dentro
+                    }
 
-                    // botón lanzar
-                    DrawUIPrimaryButton(L.BtnRollRect, "Lanzar dados");
+                    // Tira dados (presentación)
+                    var strip = new Rectangle(area.X + 6, btn.Bottom + 8, area.Width - 12, 72);
+                    DrawRect(strip, new Color(255,255,255,40), 1);
 
-                    // tira de dados
-                    DrawRect(L.DiceStripRect, new Color(255,255,255,60), 1);
                     if (diceFaces.Length >= 6)
                     {
-                        int n = diceShown.Length;
+                        int nA = 3;
+                        int nD = 2;
                         int gap = 10;
-                        int dieSize = Math.Min( (L.DiceStripRect.Height - 8), (L.DiceStripRect.Width - gap*(n+1)) / n );
-                        dieSize = Math.Max(24, dieSize);
-                        for (int i = 0; i < n; i++)
+                        int dieSize = Math.Min((strip.Height - 10), (strip.Width - gap * (nA + nD + 2)) / (nA + nD));
+                        dieSize = Math.Max(28, dieSize);
+
+                        int x = strip.X + gap;
+                        int y = strip.Y + (strip.Height - dieSize) / 2;
+
+                        // Att
+                        for (int i = 0; i < nA; i++)
                         {
                             int val = Math.Clamp(diceShown[i], 1, 6);
                             var tex = diceFaces[val - 1];
-                            int x = L.DiceStripRect.X + gap + i * (dieSize + gap);
-                            int y = L.DiceStripRect.Y + (L.DiceStripRect.Height - dieSize) / 2;
                             float sc = MathF.Min((float)dieSize / tex.Width, (float)dieSize / tex.Height);
                             spriteBatch.Draw(tex, new Vector2(x, y), null, Color.White, 0f, Vector2.Zero, sc, SpriteEffects.None, 0f);
+                            x += dieSize + gap;
+                        }
+
+                        // espacio
+                        x += gap;
+
+                        // Def
+                        for (int i = 0; i < nD; i++)
+                        {
+                            int val = Math.Clamp(diceShownDef[i], 1, 6);
+                            var tex = diceFaces[val - 1];
+                            float sc = MathF.Min((float)dieSize / tex.Width, (float)dieSize / tex.Height);
+                            spriteBatch.Draw(tex, new Vector2(x, y), null, Color.White, 0f, Vector2.Zero, sc, SpriteEffects.None, 0f);
+                            x += dieSize + gap;
                         }
                     }
+
+                    // Resultado
+                    if (lastRoll != null)
+                    {
+                        var txt = $"Resultado: A-{lastRoll.AttackerLosses}  D-{lastRoll.DefenderLosses}" + (lastRoll.TerritoryCaptured ? "  Capturado" : "");
+                        spriteBatch.DrawString(font, txt, new Vector2(area.X + 6, strip.Bottom + 8), Color.White);
+                    }
+
                     break;
                 }
+
                 case SideTab.Movimiento:
                 {
-                    spriteBatch.DrawString(font, "MOVIMIENTO", new Vector2(area.X + 6, area.Y + 6), Color.White);
-                    var sel = new Rectangle(area.X + 6, area.Y + 26, area.Width - 12, 52);
-                    spriteBatch.Draw(pixel, sel, new Color(255,255,255,20));
-                    DrawRect(sel, new Color(255,255,255,60), 1);
-                    spriteBatch.DrawString(font, "Origen/Destino: seleccionar en el mapa", new Vector2(sel.X + 6, sel.Y + 6), Color.White);
+                    spriteBatch.DrawString(font, "Movimiento", new Vector2(area.X + 6, area.Y + 6), Color.White);
+                    var info = new Rectangle(area.X + 6, area.Y + 30, area.Width - 12, 48);
+                    spriteBatch.Draw(pixel, info, new Color(255,255,255,18));
+                    DrawRect(info, new Color(255,255,255,60), 1);
+                    spriteBatch.DrawString(font, "Click en origen propio, luego destino propio conectado.", new Vector2(info.X + 8, info.Y + 12), Color.White);
 
-                    // Slider falso
-                    spriteBatch.DrawString(font, "Cantidad a mover:", new Vector2(area.X + 6, sel.Bottom + 8), Color.White);
-                    var track = new Rectangle(area.X + 6, sel.Bottom + 26, area.Width - 12, 4);
-                    spriteBatch.Draw(pixel, track, new Color(255,255,255,60));
-                    var handle = new Rectangle(area.X + track.Width / 2 + 6, track.Y - 5, 10, 16);
-                    spriteBatch.Draw(pixel, handle, new Color(255,255,255,200));
-                    DrawUIPrimaryButton(new Rectangle(area.X + 6, track.Bottom + 10, area.Width - 12, 38), "Mover tropas");
+                    // Slider +/- (simple)
+                    var row = new Rectangle(area.X + 6, info.Bottom + 8, area.Width - 12, 40);
+                    spriteBatch.Draw(pixel, row, new Color(255,255,255,18));
+                    DrawRect(row, new Color(255,255,255,60), 1);
+                    var bMinus = new Rectangle(row.X + 8, row.Y + 6, 36, 28);
+                    var bPlus  = new Rectangle(row.Right - 44, row.Y + 6, 36, 28);
+                    DrawUITextButton(bMinus, "-");
+                    DrawUITextButton(bPlus , "+");
+                    var box = new Rectangle(bMinus.Right + 8, row.Y + 6, row.Width - (bMinus.Width + bPlus.Width + 32), 28);
+                    spriteBatch.Draw(pixel, box, new Color(255,255,255,80));
+                    DrawRect(box, new Color(0,0,0,180), 1);
+                    var s = font!.MeasureString(moveAmountSlider.ToString());
+                    spriteBatch.DrawString(font, moveAmountSlider.ToString(), new Vector2(box.X + (box.Width - s.X)/2, box.Y + (box.Height - s.Y)/2), Color.Black);
+
+                    var mouse = Mouse.GetState();
+                    if (mouse.LeftButton == ButtonState.Pressed)
+                    {
+                        var p = mouse.Position;
+                        if (bMinus.Contains(p)) moveAmountSlider = Math.Max(1, moveAmountSlider - 1);
+                        if (bPlus.Contains(p))  moveAmountSlider = Math.Min(99, moveAmountSlider + 1);
+                    }
+
                     break;
                 }
+
                 case SideTab.Cartas:
                 {
-                    spriteBatch.DrawString(font, "CARTAS", new Vector2(area.X + 6, area.Y + 6), Color.White);
-                    var grid = new Rectangle(area.X + 6, area.Y + 26, area.Width - 12, area.Height - 80);
-                    spriteBatch.Draw(pixel, grid, new Color(255,255,255,20));
+                    spriteBatch.DrawString(font, "Cartas", new Vector2(area.X + 6, area.Y + 6), Color.White);
+                    var grid = new Rectangle(area.X + 6, area.Y + 30, area.Width - 12, area.Height - 40);
+                    spriteBatch.Draw(pixel, grid, new Color(255,255,255,18));
                     DrawRect(grid, new Color(255,255,255,60), 1);
-
-                    int cols = 3, rows = 2, gap = 8;
-                    int cw = (grid.Width - gap*(cols+1)) / cols;
-                    int ch = (grid.Height - gap*(rows+1)) / rows;
-                    for (int r = 0; r < rows; r++)
-                    for (int c = 0; c < cols; c++)
-                    {
-                        var rct = new Rectangle(grid.X + gap + c*(cw+gap), grid.Y + gap + r*(ch+gap), cw, ch);
-                        spriteBatch.Draw(pixel, rct, new Color(255,255,255,30));
-                        DrawRect(rct, new Color(255,255,255,90), 1);
-                    }
-                    DrawUIPrimaryButton(new Rectangle(area.X + 6, area.Bottom - 46, area.Width - 12, 38), "Canjear set");
+                    spriteBatch.DrawString(font, "(Pendiente de implementar)", new Vector2(grid.X + 8, grid.Y + 8), Color.White);
                     break;
                 }
+
                 case SideTab.Log:
                 {
-                    spriteBatch.DrawString(font, "LOG / HISTORIAL", new Vector2(area.X + 6, area.Y + 6), Color.White);
-                    var box = new Rectangle(area.X + 6, area.Y + 26, area.Width - 12, area.Height - 32);
-                    spriteBatch.Draw(pixel, box, new Color(255,255,255,20));
+                    spriteBatch.DrawString(font, "Log", new Vector2(area.X + 6, area.Y + 6), Color.White);
+                    var box = new Rectangle(area.X + 6, area.Y + 28, area.Width - 12, area.Height - 34);
+                    spriteBatch.Draw(pixel, box, new Color(255,255,255,16));
                     DrawRect(box, new Color(255,255,255,60), 1);
-                    spriteBatch.DrawString(font, "- Jugador Azul coloco 3 en NORTEAMERICA_CANADA", new Vector2(box.X + 6, box.Y + 6), Color.White);
-                    spriteBatch.DrawString(font, "- Ataque: ESPANA -> FRANCIA (3v2). Tiradas: 6-5 vs 5-2", new Vector2(box.X + 6, box.Y + 24), Color.White);
-                    spriteBatch.DrawString(font, "- Conquista: FRANCIA", new Vector2(box.X + 6, box.Y + 42), Color.White);
+
+                    int y = box.Y + 8;
+                    for (int i = Math.Max(0, uiLog.Count - 20); i < uiLog.Count; i++)
+                    {
+                        spriteBatch.DrawString(font!, uiLog[i], new Vector2(box.X + 8, y), Color.White);
+                        y += 18;
+                        if (y > box.Bottom - 20) break;
+                    }
                     break;
                 }
             }
         }
 
-        // ===================== Utilidades Draw/UI =====================
+        private void TryRollDiceFromEngine()
+        {
+            if (engine == null || attackController == null)
+            {
+                uiLog.Add("No estas en fase de ataque.");
+                return;
+            }
+            if (engine.State.Phase != Phase.Attack)
+            {
+                uiLog.Add("No estas en fase de ataque.");
+                return;
+            }
+
+            if (!attackController.RollOnce(out DiceRollResult? r, out string err) || r == null)
+            {
+                uiLog.Add("No se pudo tirar: " + err);
+                return;
+            }
+
+            lastRoll = r;
+            uiLog.Add($"Tiro: A[{string.Join(",", r.AttackerDice)}] vs D[{string.Join(",", r.DefenderDice)}]  Perdidas A:{r.AttackerLosses} D:{r.DefenderLosses}" + (r.TerritoryCaptured ? " CAPTURADO" : ""));
+
+            // Inicia animación (actual)
+            diceState = DiceState.Rolling;
+            diceTimer = 0;
+            for (int i = 0; i < diceShown.Length; i++) diceShown[i] = rng.Next(1, 7);
+            for (int i = 0; i < diceShownDef.Length; i++) diceShownDef[i] = rng.Next(1, 7);
+
+            // Animator opcional
+            int aCount = r.AttackerDice?.Length ?? 0;
+            int dCount = r.DefenderDice?.Length ?? 0;
+            diceAnimator?.Start(aCount, dCount, DICE_ROLL_DURATION);
+        }
+
+        // ======== Util draw ========
+        private void DrawMenus()
+        {
+            var bg = menuBg ?? mapaVisible;
+            var scale = ComputeScaleToFit(bg.Width, bg.Height, graficos.PreferredBackBufferWidth, graficos.PreferredBackBufferHeight);
+            var pos = new Vector2(
+                (graficos.PreferredBackBufferWidth - bg.Width * scale) * 0.5f,
+                (graficos.PreferredBackBufferHeight - bg.Height * scale) * 0.5f
+            );
+            spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+
+            var lista = estado switch
+            {
+                AppState.MenuOpciones => botonesOpciones,
+                AppState.MenuJugar => botonesJugar,
+                AppState.MenuPersonajes => botonesPersonajes,
+                _ => botonesMenu
+            };
+
+            if (estado == AppState.MenuPersonajes)
+            {
+                if (font != null)
+                {
+                    string titulo = "Selecciona tu personaje";
+                    var size = font.MeasureString(titulo);
+                    spriteBatch.DrawString(font, titulo, new Vector2(
+                        (graficos.PreferredBackBufferWidth - size.X) * 0.5f,
+                        pos.Y + 16), Color.White);
+                }
+
+                for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
+                {
+                    var rect = avatarRects[i];
+                    var tex = avatarTex[i];
+                    spriteBatch.Draw(pixel, rect, new Color(0, 0, 0, 120));
+                    DrawRect(rect, Color.White, 2);
+
+                    float sx = (float)rect.Width / tex.Width;
+                    float sy = (float)rect.Height / tex.Height;
+                    float sc = MathF.Min(sx, sy) * 0.92f;
+                    var drawSize = new Vector2(tex.Width * sc, tex.Height * sc);
+                    var posAv = new Vector2(rect.X + (rect.Width - drawSize.X) * 0.5f, rect.Y + (rect.Height - drawSize.Y) * 0.5f);
+                    spriteBatch.Draw(tex, posAv, null, Color.White, 0f, Vector2.Zero, sc, SpriteEffects.None, 0f);
+
+                    if (i == selectedAvatarIndex)
+                        DrawRect(new Rectangle(rect.X - 3, rect.Y - 3, rect.Width + 6, rect.Height + 6), new Color(0, 255, 0, 220), 3);
+                }
+
+                for (int i = 0; i < botonesPersonajes.Count; i++)
+                {
+                    var b = botonesPersonajes[i];
+                    var bgc = b.Hover ? new Color(255,255,255,190) : new Color(255,255,255,140);
+                    spriteBatch.Draw(pixel, new Rectangle(b.Bounds.X + 3, b.Bounds.Y + 3, b.Bounds.Width, b.Bounds.Height), new Color(0, 0, 0, 80));
+                    spriteBatch.Draw(pixel, b.Bounds, bgc);
+                    DrawRect(b.Bounds, new Color(0, 0, 0, 180), 2);
+
+                    if (font != null)
+                    {
+                        var size = font.MeasureString(b.Text);
+                        var tx = b.Bounds.X + (b.Bounds.Width - size.X) * 0.5f;
+                        var ty = b.Bounds.Y + (b.Bounds.Height - size.Y) * 0.5f;
+                        spriteBatch.DrawString(font, b.Text, new Vector2(tx, ty), Color.Black);
+                    }
+                }
+                return;
+            }
+
+            // Otros menús
+            for (int i = 0; i < lista.Count; i++)
+            {
+                var b = lista[i];
+                var bgc = b.Hover ? new Color(255,255,255,190) : new Color(255,255,255,140);
+                spriteBatch.Draw(pixel, new Rectangle(b.Bounds.X + 3, b.Bounds.Y + 3, b.Bounds.Width, b.Bounds.Height), new Color(0, 0, 0, 80));
+                spriteBatch.Draw(pixel, b.Bounds, bgc);
+                DrawRect(b.Bounds, new Color(0, 0, 0, 180), 2);
+
+                if (font != null)
+                {
+                    var size = font.MeasureString(b.Text);
+                    var tx = b.Bounds.X + (b.Bounds.Width - size.X) * 0.5f;
+                    var ty = b.Bounds.Y + (b.Bounds.Height - size.Y) * 0.5f;
+                    spriteBatch.DrawString(font, b.Text, new Vector2(tx, ty), Color.Black);
+                }
+            }
+        }
+
         private float ComputeScaleToFit(int texW, int texH, int viewW, int viewH)
         {
             float sx = (float)viewW / texW;
@@ -1258,7 +1394,7 @@ namespace CrazyRiskGame
         }
         private void DrawUIPrimaryButton(Rectangle r, string text)
         {
-            spriteBatch.Draw(pixel, new Rectangle(r.X + 2, r.Y + 2, r.Width, r.Height), new Color(0,0,0,70));
+            spriteBatch.Draw(pixel, new Rectangle(r.X + 3, r.Y + 3, r.Width, r.Height), new Color(0,0,0,70));
             spriteBatch.Draw(pixel, r, new Color(255,255,255,210));
             DrawRect(r, new Color(0,0,0,190), 2);
             if (font != null)
@@ -1276,18 +1412,6 @@ namespace CrazyRiskGame
                 var s = font.MeasureString(text);
                 spriteBatch.DrawString(font, text, new Vector2(r.X + (r.Width - s.X) * 0.5f, r.Y + (r.Height - s.Y) * 0.5f), Color.Black);
             }
-        }
-        private void DrawUICheck(Rectangle box, bool on, string label)
-        {
-            spriteBatch.Draw(pixel, box, Color.White);
-            DrawRect(box, new Color(0,0,0,200), 1);
-            if (on)
-            {
-                var inner = new Rectangle(box.X + 3, box.Y + 3, box.Width - 6, box.Height - 6);
-                spriteBatch.Draw(pixel, inner, new Color(0, 200, 0, 220));
-            }
-            if (font != null)
-                spriteBatch.DrawString(font, label, new Vector2(box.Right + 6, box.Y - 2), Color.White);
         }
     }
 }
