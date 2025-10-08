@@ -11,12 +11,10 @@ using CrazyRisk.Core;
 
 // === Integraciones ===
 using CoreCardsService = CrazyRisk.Core.CardsService;
-// using GameCardsService = CrazyRiskGame.Game.Services.CardsService; // (si algún día quieres usar la otra)
 using CrazyRiskGame.Play.Adapters;
 using CrazyRiskGame.Game.Services;
 using CrazyRiskGame.Play.Controllers;
 using CrazyRiskGame.Play.Animations;
-// Si quieres acoplar los renderers en un siguiente paso, importamos el namespace, pero hoy no los invocamos:
 using CrazyRiskGame.Play.UI;
 
 namespace CrazyRiskGame
@@ -33,7 +31,8 @@ namespace CrazyRiskGame
         private const int UI_TOP_BAR      = 72;
         private const int UI_BOTTOM_BAR   = 72;
 
-        private enum AppState { MenuPrincipal, MenuOpciones, MenuJugar, MenuPersonajes, EnJuego }
+        // +++ NUEVO: agregamos estados MenuMultiplayer y Lobby
+        private enum AppState { MenuPrincipal, MenuOpciones, MenuJugar, MenuPersonajes, MenuMultiplayer, Lobby, EnJuego }
         private AppState estado = AppState.MenuPrincipal;
 
         // ====== Assets ======
@@ -48,6 +47,8 @@ namespace CrazyRiskGame
         private readonly List<Button> botonesOpciones = new();
         private readonly List<Button> botonesJugar = new();
         private readonly List<Button> botonesPersonajes = new();
+        // +++ NUEVO: submenú Multiplayer
+        private readonly List<Button> botonesMultiplayer = new();
 
         // ====== Selección de avatares ======
         private readonly List<Texture2D> avatarTex = new();
@@ -76,13 +77,12 @@ namespace CrazyRiskGame
 
         // ====== Máscaras / Territorios ======
 
-        // Adyacencia vía nuestra matriz (sustituto de TerritoryState.Neighbors)
-private bool AreAdjacent(string fromId, string toId)
-{
-    foreach (var n in NeighborsOf(fromId))
-        if (n == toId) return true;
-    return false;
-} 
+        private bool AreAdjacent(string fromId, string toId)
+        {
+            foreach (var n in NeighborsOf(fromId))
+                if (n == toId) return true;
+            return false;
+        }
         private readonly Dictionary<string, Texture2D> maskPorId = new();
         private readonly Dictionary<string, Color[]> maskPixelsPorId = new();
         private readonly Dictionary<string, int> idToIndex = new();
@@ -95,7 +95,7 @@ private bool AreAdjacent(string fromId, string toId)
         private string? ultimoLogHover = null;
 
         private KeyboardState prevKb;
-        private MouseState prevMouse; // <-- NUEVO: para detectar flanco de click
+        private MouseState prevMouse;
         private Map? mapaCore = null;
 
         private static readonly string[] IDS_TERRITORIOS = new[]
@@ -125,7 +125,7 @@ private bool AreAdjacent(string fromId, string toId)
 
         private ReinforcementService? reinforcementService;
         private FortifyService? fortifyService;
-        private AttackService? attackService;               // si no existe en tu árbol, no se usa
+        private AttackService? attackService;
         private SelectionService? selectionService;
         private TurnService? turnService;
         private ContinentBonusService? continentBonusService;
@@ -170,8 +170,14 @@ private bool AreAdjacent(string fromId, string toId)
         private int moveAmountSlider = 1;
 
         // ====== Selección local para ataque ======
-        private string? attackFrom; // <-- NUEVO
-        private string? attackTo;   // <-- NUEVO
+        private string? attackFrom;
+        private string? attackTo;
+
+        // ====== Multiplayer (estados UI locales mínimos) ======
+        private string playerName = "Jugador";
+        private bool lobbyIsHost = false;
+        private readonly List<string> lobbyPlayers = new(); // simple lista para UI
+        private bool lobbyReadyToStart = false;
 
         public Juego()
         {
@@ -375,22 +381,24 @@ private bool AreAdjacent(string fromId, string toId)
             botonesOpciones.Clear();
             botonesJugar.Clear();
             botonesPersonajes.Clear();
+            botonesMultiplayer.Clear();
             avatarRects.Clear();
 
             int W = graficos.PreferredBackBufferWidth;
             int H = graficos.PreferredBackBufferHeight;
 
-            // Menú principal
+            // Menú principal (agregamos 4ta opción: Multiplayer)
             int bw = (int)(W * 0.28f);
             int bh = 46;
             int cx = W / 2 - bw / 2;
             int gap = 12;
-            int totalH = bh * 3 + gap * 2;
+            int totalH = bh * 4 + gap * 3;
             int startY = H / 2 - totalH / 2;
 
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 0, bw, bh), Text = "Jugar" });
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 1, bw, bh), Text = "Opciones" });
-            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 2, bw, bh), Text = "Salir" });
+            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 2, bw, bh), Text = "Multiplayer (LAN)" });
+            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 3, bw, bh), Text = "Salir" });
 
             // Opciones
             int oy = H / 2 - (bh * 5 + gap * 4) / 2;
@@ -428,6 +436,12 @@ private bool AreAdjacent(string fromId, string toId)
             int baseY = gy + gridH + 30;
             botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY, bw2, 56), Text = "Confirmar" });
             botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY + 72, bw2, 56), Text = "Volver" });
+
+            // Multiplayer (LAN) submenu
+            int my = H / 2 - (bh * 3 + gap * 2) / 2;
+            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 0, bw, bh), Text = "Crear lobby (host)" });
+            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 1, bw, bh), Text = "Unirse a lobby" });
+            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 2, bw, bh), Text = "Volver" });
         }
 
         private void RebuildSideTabs()
@@ -548,7 +562,6 @@ private bool AreAdjacent(string fromId, string toId)
 
             if (estado == AppState.EnJuego)
             {
-                // Cargar mapa lógico; si no existe el JSON, exportamos y recargamos
                 if (mapaCore == null)
                 {
                     ExportarTerritoriesJson();
@@ -561,29 +574,24 @@ private bool AreAdjacent(string fromId, string toId)
                 }
                 else
                 {
-                    // Motor y capa de integración
                     engine = new GameEngine(mapaCore, players);
 
                     engineAdapter = new EngineAdapter(engine);
                     actionsAdapter = new EngineActionsAdapter(engine);
                     input = new InputAdapter();
 
-                    // Servicios: pasan GameEngine
                     selectionService       = new SelectionService(engine!);
                     reinforcementService   = new ReinforcementService(engine!);
                     fortifyService         = new FortifyService(engine!);
                     try { attackService    = new AttackService(engine!); } catch { attackService = null; }
                     turnService            = new TurnService(engine!);
-                    // (TEMP) deshabilitado: tu ctor real de ContinentBonusService pide defs, no el engine
                     continentBonusService  = null;
-                  //  cardsService           = new CardsService();
+                    // cardsService        = new CardsService();
 
-                    // Controllers (aunque no los usemos para colocar/mover ahora)
                     reinforcementController = new ReinforcementController(engine!);
                     fortifyController       = new FortifyController(engine!);
                     mapSelectionController  = null;
 
-                    // Dados
                     attackController        = new AttackController(engine!, selectionService, msg => uiLog.Add(msg));
                     diceAnimator            = new DiceAnimator();
 
@@ -599,7 +607,6 @@ private bool AreAdjacent(string fromId, string toId)
                 sideCollapsed = false;
                 RebuildSideTabs();
 
-                // Reset de dados
                 diceState = DiceState.Idle;
                 diceTimer = 0;
                 for (int i = 0; i < diceShown.Length; i++) diceShown[i] = 1;
@@ -615,18 +622,22 @@ private bool AreAdjacent(string fromId, string toId)
             var mouse = Mouse.GetState();
             var pos = new Point(mouse.X, mouse.Y);
 
-            // Captura de input (adapter)
             input?.Capture();
 
-            // Esc para atrás
-            if (kb.IsKeyDown(Keys.Escape))
+            // ESC navegación
+            if (kb.IsKeyDown(Keys.Escape) && !prevKb.IsKeyDown(Keys.Escape))
             {
                 switch (estado)
                 {
                     case AppState.MenuOpciones:
                     case AppState.MenuJugar:
                     case AppState.MenuPersonajes:
+                    case AppState.MenuMultiplayer:
                         CambiarEstado(AppState.MenuPrincipal);
+                        break;
+                    case AppState.Lobby:
+                        // salir del lobby vuelve al submenú Multiplayer
+                        CambiarEstado(AppState.MenuMultiplayer);
                         break;
                     case AppState.EnJuego:
                         CambiarEstado(AppState.MenuPrincipal);
@@ -637,17 +648,26 @@ private bool AreAdjacent(string fromId, string toId)
                 }
             }
 
-            if (estado != AppState.EnJuego)
+            if (estado == AppState.MenuPrincipal || estado == AppState.MenuOpciones || estado == AppState.MenuJugar || estado == AppState.MenuPersonajes || estado == AppState.MenuMultiplayer)
             {
                 UpdateMenus(kb, mouse, pos);
                 prevKb = kb;
-                prevMouse = mouse; // mantener sincronizado también en menús
+                prevMouse = mouse;
+                base.Update(gameTime);
+                return;
+            }
+
+            if (estado == AppState.Lobby)
+            {
+                UpdateLobby(mouse, pos);
+                prevKb = kb;
+                prevMouse = mouse;
                 base.Update(gameTime);
                 return;
             }
 
             // ===== En Juego =====
-            // Clicks sobre panel lateral
+
             sideCollapseButton.Hover = sideCollapseButton.Bounds.Contains(pos);
             if (Clicked(sideCollapseButton.Bounds, mouse))
             {
@@ -669,7 +689,6 @@ private bool AreAdjacent(string fromId, string toId)
                 }
             }
 
-            // Bottom bar
             for (int i = 0; i < bottomButtons.Count; i++)
             {
                 var b = bottomButtons[i];
@@ -680,18 +699,15 @@ private bool AreAdjacent(string fromId, string toId)
                     OnBottomButtonClick(b.Text);
             }
 
-            // Export data J
             if (kb.IsKeyDown(Keys.J) && !prevKb.IsKeyDown(Keys.J))
             {
                 ExportarTerritoriesJson();
                 CargarMapaCoreSiExiste();
             }
 
-            // Interacción con el mapa solo dentro del rectMapViewport
             bool sobreMapa = rectMapViewport.Contains(pos);
             if (sobreMapa)
             {
-                // Convertir a coords de textura
                 int mx = (int)((mouse.X - rectMapViewport.X) / MAP_SCALE);
                 int my = (int)((mouse.Y - rectMapViewport.Y) / MAP_SCALE);
 
@@ -710,14 +726,11 @@ private bool AreAdjacent(string fromId, string toId)
                     territorioSeleccionado = null;
                     attackFrom = null;
                     attackTo   = null;
-                    // attackController?.ClearSelection();
                 }
             }
 
-            // Animación de dados (si decides usar DiceAnimator más adelante)
             diceAnimator?.Update(gameTime);
 
-            // Animación de dados (actual)
             if (diceState == DiceState.Rolling)
             {
                 diceTimer += gameTime.ElapsedGameTime.TotalSeconds;
@@ -734,7 +747,6 @@ private bool AreAdjacent(string fromId, string toId)
                     diceState = DiceState.Show;
                     if (lastRoll != null)
                     {
-                        // Mostrar caras finales
                         for (int i = 0; i < diceShown.Length; i++)
                             diceShown[i] = i < lastRoll.AttackerDice.Length ? lastRoll.AttackerDice[i] : 1;
                         for (int i = 0; i < diceShownDef.Length; i++)
@@ -744,8 +756,157 @@ private bool AreAdjacent(string fromId, string toId)
             }
 
             prevKb = kb;
-            prevMouse = mouse; // <-- NUEVO: actualizar flanco al final
+            prevMouse = mouse;
             base.Update(gameTime);
+        }
+        // ======== Botones de la barra inferior ========
+        private void OnBottomButtonClick(string text)
+        {
+            if (engine == null) return;
+
+            switch (text)
+            {
+                case "Confirmar":
+                    uiLog.Add("Confirmar pulsado.");
+                    break;
+
+                case "Deshacer":
+                    uiLog.Add("Deshacer pulsado (sin pila de undo).");
+                    break;
+
+                case "Cancelar":
+                    territorioSeleccionado = null;
+                    attackFrom = null;
+                    attackTo = null;
+                    uiLog.Add("Cancelado.");
+                    diceState = DiceState.Idle;
+                    break;
+
+                case "Siguiente":
+                    engine!.NextPhaseOrTurn();
+                    uiLog.Add("Siguiente: " + engine.State.Phase.ToString());
+                    sideTab = engine.State.Phase switch
+                    {
+                        Phase.Reinforcement => SideTab.Refuerzos,
+                        Phase.Attack => SideTab.Ataque,
+                        _ => SideTab.Movimiento
+                    };
+
+                    // reset selecciones transversales por fase
+                    if (engine.State.Phase != Phase.Attack) { attackFrom = attackTo = null; }
+                    if (engine.State.Phase != Phase.Fortify) { territorioSeleccionado = null; }
+
+                    break;
+            }
+        }
+        // ======== Click izquierdo sobre el mapa ========
+        private void OnMapLeftClick(int mx, int my)
+        {
+            if (engine == null) return;
+
+            string? hit = DetectarTerritorioPorGris(mx, my);
+            if (hit == null) return;
+
+            switch (engine.State.Phase)
+            {
+                case Phase.Reinforcement:
+                    if (engine.State.Territories.TryGetValue(hit, out var t1) && t1.OwnerId == engine.State.CurrentPlayerId)
+                    {
+                        territorioSeleccionado = hit;
+                        uiLog.Add("Seleccionado para refuerzos: " + hit);
+                    }
+                    else
+                    {
+                        uiLog.Add("[INFO] Selecciona un territorio propio para refuerzos.");
+                    }
+                    break;
+
+                case Phase.Attack:
+                    {
+                        // Primer click: atacante propio (>1 tropas). Segundo: defensor enemigo adyacente.
+                        if (attackFrom == null)
+                        {
+                            if (engine.State.Territories.TryGetValue(hit, out var fromT)
+                                && fromT.OwnerId == engine.State.CurrentPlayerId
+                                && fromT.Troops > 1)
+                            {
+                                attackFrom = hit;
+                                attackTo = null;
+                                uiLog.Add("Atacante seleccionado: " + attackFrom);
+                            }
+                            else
+                            {
+                                uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas para atacar.");
+                            }
+                        }
+                        else
+                        {
+                            if (hit == attackFrom)
+                            {
+                                attackFrom = null;
+                                attackTo = null;
+                                uiLog.Add("Atacante deseleccionado.");
+                            }
+                            else
+                            {
+                                if (engine.State.Territories.TryGetValue(hit, out var t)
+                                    && t.OwnerId != engine.State.CurrentPlayerId
+                                    && AreAdjacent(attackFrom!, hit))
+                                {
+                                    attackTo = hit;
+                                    uiLog.Add("Objetivo seleccionado: " + attackTo);
+                                }
+                                else
+                                {
+                                    uiLog.Add("[INFO] El defensor debe ser enemigo y adyacente.");
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                case Phase.Fortify:
+                    {
+                        // Primer click: origen propio (>1). Segundo: destino propio adyacente
+                        if (territorioSeleccionado == null)
+                        {
+                            if (engine.State.Territories.TryGetValue(hit, out var from)
+                                && from.OwnerId == engine.State.CurrentPlayerId
+                                && from.Troops > 1)
+                            {
+                                territorioSeleccionado = hit;
+                                uiLog.Add("Fortificar origen: " + hit);
+                            }
+                            else
+                            {
+                                uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas como origen.");
+                            }
+                        }
+                        else
+                        {
+                            if (hit == territorioSeleccionado)
+                            {
+                                territorioSeleccionado = null;
+                                uiLog.Add("Fortificar: origen deseleccionado.");
+                            }
+                            else if (engine.State.Territories.TryGetValue(hit, out var to)
+                                     && to.OwnerId == engine.State.CurrentPlayerId
+                                     && AreAdjacent(territorioSeleccionado!, hit))
+                            {
+                                int move = Math.Max(1, moveAmountSlider);
+                                // Simulación: aquí iría tu llamada real a FortifyService cuando lo conectes.
+                                uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move})");
+                                territorioSeleccionado = null;
+                            }
+                            else
+                            {
+                                territorioSeleccionado = null;
+                                uiLog.Add("[INFO] El destino debe ser propio y adyacente al origen.");
+                            }
+                        }
+                        break;
+                    }
+            }
         }
 
         private void UpdateMenus(KeyboardState kb, MouseState mouse, Point pos)
@@ -755,18 +916,20 @@ private bool AreAdjacent(string fromId, string toId)
                 AppState.MenuOpciones => botonesOpciones,
                 AppState.MenuJugar => botonesJugar,
                 AppState.MenuPersonajes => botonesPersonajes,
+                AppState.MenuMultiplayer => botonesMultiplayer,
                 _ => botonesMenu
             };
 
-            // Hover
             if (estado != AppState.MenuPersonajes)
             {
                 for (int i = 0; i < lista.Count; i++)
                 {
                     var b = lista[i];
                     b.Hover = b.Bounds.Contains(pos);
+
                     if (estado == AppState.MenuOpciones) botonesOpciones[i] = b;
                     else if (estado == AppState.MenuJugar) botonesJugar[i] = b;
+                    else if (estado == AppState.MenuMultiplayer) botonesMultiplayer[i] = b;
                     else botonesMenu[i] = b;
                 }
             }
@@ -780,14 +943,14 @@ private bool AreAdjacent(string fromId, string toId)
                 }
             }
 
-            // Clicks
             if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
             {
                 if (estado == AppState.MenuPrincipal)
                 {
                     if (botonesMenu[0].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuJugar); }
                     else if (botonesMenu[1].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuOpciones); }
-                    else if (botonesMenu[2].Bounds.Contains(pos)) { Exit(); }
+                    else if (botonesMenu[2].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuMultiplayer); }
+                    else if (botonesMenu[3].Bounds.Contains(pos)) { Exit(); }
                 }
                 else if (estado == AppState.MenuOpciones)
                 {
@@ -804,7 +967,6 @@ private bool AreAdjacent(string fromId, string toId)
                     else if (botonesOpciones[5].Bounds.Contains(pos))
                     { CambiarEstado(AppState.MenuPrincipal); }
 
-                    // refrescar textos
                     var b0 = botonesOpciones[0]; b0.Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}"; botonesOpciones[0] = b0;
                     var b1 = botonesOpciones[1]; b1.Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}"; botonesOpciones[1] = b1;
                     var b4 = botonesOpciones[4]; b4.Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}"; botonesOpciones[4] = b4;
@@ -835,159 +997,66 @@ private bool AreAdjacent(string fromId, string toId)
                         CambiarEstado(AppState.MenuJugar);
                     }
                 }
-            }
-        }
-
-        private void OnBottomButtonClick(string text)
-        {
-            if (engine == null) return;
-
-            switch (text)
-            {
-                case "Confirmar":
-                    uiLog.Add("Confirmar pulsado.");
-                    break;
-
-                case "Deshacer":
-                    uiLog.Add("Deshacer pulsado (sin pila de undo).");
-                    break;
-
-                case "Cancelar":
-                    territorioSeleccionado = null;
-                    attackFrom = null;
-                    attackTo   = null;
-                    // attackController?.ClearSelection();
-                    uiLog.Add("Cancelado.");
-                    diceState = DiceState.Idle;
-                    break;
-
-                case "Siguiente":
-                    engine!.NextPhaseOrTurn();
-                    uiLog.Add("Siguiente: " + engine.State.Phase.ToString());
-                    sideTab = engine.State.Phase switch
-                    {
-                        Phase.Reinforcement => SideTab.Refuerzos,
-                        Phase.Attack        => SideTab.Ataque,
-                        _                   => SideTab.Movimiento
-                    };
-
-                    // reset selecciones transversales por fase
-                    if (engine.State.Phase != Phase.Attack) { attackFrom = attackTo = null; }
-                    if (engine.State.Phase != Phase.Fortify) { territorioSeleccionado = null; }
-
-                    break;
-            }
-        }
-
-        private void OnMapLeftClick(int mx, int my)
-        {
-            if (engine == null) return;
-
-            string? hit = DetectarTerritorioPorGris(mx, my);
-            if (hit == null) return;
-
-            switch (engine.State.Phase)
-            {
-                case Phase.Reinforcement:
-                    if (engine.State.Territories.TryGetValue(hit, out var t1) && t1.OwnerId == engine.State.CurrentPlayerId)
-                    {
-                        // Solo selecciona; la colocación real se hace con el botón del panel
-                        territorioSeleccionado = hit;
-                        uiLog.Add("Seleccionado para refuerzos: " + hit);
-                    }
-                    else
-                    {
-                        uiLog.Add("[INFO] Selecciona un territorio propio para refuerzos.");
-                    }
-                    break;
-
-                case Phase.Attack:
-{
-    // Primer click: territorio atacante propio (con >1 tropas)
-    // Segundo click: territorio defensor (enemigo y adyacente)
-    if (attackFrom == null)
-    {
-        if (engine.State.Territories.TryGetValue(hit, out var fromT)
-            && fromT.OwnerId == engine.State.CurrentPlayerId
-            && fromT.Troops > 1)
-        {
-            attackFrom = hit;
-            attackTo = null;
-            uiLog.Add("Atacante seleccionado: " + attackFrom);
-        }
-        else
-        {
-            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas para atacar.");
-        }
-    }
-    else
-    {
-        if (hit == attackFrom)
-        {
-            attackFrom = null;
-            attackTo = null;
-            uiLog.Add("Atacante deseleccionado.");
-        }
-        else
-        {
-            if (engine.State.Territories.TryGetValue(hit, out var t)
-                && t.OwnerId != engine.State.CurrentPlayerId
-                && AreAdjacent(attackFrom!, hit)) // ← aquí sustituimos el uso de f.Neighbors
-            {
-                attackTo = hit;
-                uiLog.Add("Objetivo seleccionado: " + attackTo);
-            }
-            else
-            {
-                uiLog.Add("[INFO] El defensor debe ser enemigo y adyacente.");
-            }
-        }
-    }
-    break;
-}
-
-                case Phase.Fortify:
+                else if (estado == AppState.MenuMultiplayer)
                 {
-                    // Primer click: origen propio (>1); segundo: destino propio adyacente
-                    if (territorioSeleccionado == null)
+                    if (botonesMultiplayer[0].Bounds.Contains(pos))
                     {
-                        if (engine.State.Territories.TryGetValue(hit, out var from)
-                            && from.OwnerId == engine.State.CurrentPlayerId
-                            && from.Troops > 1)
-                        {
-                            territorioSeleccionado = hit;
-                            uiLog.Add("Fortificar origen: " + hit);
-                        }
-                        else
-                        {
-                            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas como origen.");
-                        }
+                        // Crear lobby local (host)
+                        lobbyIsHost = true;
+                        lobbyPlayers.Clear();
+                        lobbyPlayers.Add(playerName + " (Host)");
+                        lobbyReadyToStart = false;
+                        estado = AppState.Lobby;
                     }
-                    else
+                    else if (botonesMultiplayer[1].Bounds.Contains(pos))
                     {
-                        if (hit == territorioSeleccionado)
-                        {
-                            territorioSeleccionado = null;
-                            uiLog.Add("Fortificar: origen deseleccionado.");
-                        }
-                        else if (engine.State.Territories.TryGetValue(hit, out var to)
-         && to.OwnerId == engine.State.CurrentPlayerId
-         && AreAdjacent(territorioSeleccionado!, hit))
-{
-    int move = Math.Max(1, moveAmountSlider);
+                        // Unirse a lobby (cliente) - mock
+                        lobbyIsHost = false;
+                        lobbyPlayers.Clear();
+                        lobbyPlayers.Add("Host");
+                        lobbyPlayers.Add(playerName);
+                        lobbyReadyToStart = false;
+                        estado = AppState.Lobby;
+                    }
+                    else if (botonesMultiplayer[2].Bounds.Contains(pos))
+                    {
+                        CambiarEstado(AppState.MenuPrincipal);
+                    }
+                }
+            }
+        }
 
-    // SIM: quitamos la llamada a un método inexistente y dejamos el flujo operativo.
-    uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move})");
-    territorioSeleccionado = null;
-}
-                        
-                        else
-                        {
-                            territorioSeleccionado = null;
-                            uiLog.Add("[INFO] El destino debe ser propio y adyacente al origen.");
-                        }
-                    }
-                    break;
+        // ======== Lobby simple (UI local, sin red todavía) ========
+        private void UpdateLobby(MouseState mouse, Point pos)
+        {
+            // definimos rects botones dentro del lobby
+            int W = graficos.PreferredBackBufferWidth;
+            int H = graficos.PreferredBackBufferHeight;
+
+            int bw = (int)(W * 0.24f);
+            int bh = 42;
+            int cx = W / 2 - bw / 2;
+            int baseY = (int)(H * 0.70f);
+            var btnVolver  = new Rectangle(cx, baseY, bw, bh);
+            var btnIniciar = new Rectangle(cx, baseY - (bh + 12), bw, bh);
+
+            // hover no persistente (solo para dibujado)
+            bool hovBack = btnVolver.Contains(pos);
+            bool hovStart = btnIniciar.Contains(pos);
+
+            if (Clicked(btnVolver, mouse))
+            {
+                CambiarEstado(AppState.MenuMultiplayer);
+                return;
+            }
+
+            if (Clicked(btnIniciar, mouse))
+            {
+                // Solo puede iniciar el host, y con 2-3 jugadores
+                if (lobbyIsHost && lobbyPlayers.Count >= 2)
+                {
+                    lobbyReadyToStart = true;
+                    CambiarEstado(AppState.EnJuego);
                 }
             }
         }
@@ -1039,6 +1108,15 @@ private bool AreAdjacent(string fromId, string toId)
             GraphicsDevice.Clear(Color.Black);
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
+            // Lobby: pantalla dedicada
+            if (estado == AppState.Lobby)
+            {
+                DrawLobby();
+                spriteBatch.End();
+                base.Draw(gameTime);
+                return;
+            }
+
             if (estado != AppState.EnJuego)
             {
                 DrawMenus();
@@ -1065,7 +1143,7 @@ private bool AreAdjacent(string fromId, string toId)
             else if (territorioHover != null && maskPorId.TryGetValue(territorioHover, out var hovMask))
                 spriteBatch.Draw(hovMask, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
 
-            // HUD superior: jugador y fase
+            // HUD superior
             if (font != null && engine != null)
             {
                 string hud = $"Jugador: {engine.State.CurrentPlayerId}   Fase: {engine.State.Phase}";
@@ -1078,8 +1156,8 @@ private bool AreAdjacent(string fromId, string toId)
                 }
             }
 
-            // Panel lateral (pestaña y header)
-            sideCollapseButton.Bounds = new Rectangle(sideCollapsed ? rectSide.X - 24 : rectSide.X - 24, rectSide.Y + 8, 24, 28);
+            // Panel lateral
+            sideCollapseButton.Bounds = new Rectangle(rectSide.X - 24, rectSide.Y + 8, 24, 28);
             var colBg = sideCollapseButton.Hover ? new Color(255,255,255,220) : new Color(255,255,255,180);
             spriteBatch.Draw(pixel, sideCollapseButton.Bounds, colBg);
             DrawRect(sideCollapseButton.Bounds, new Color(0,0,0,200), 2);
@@ -1094,7 +1172,6 @@ private bool AreAdjacent(string fromId, string toId)
 
             if (!sideCollapsed)
             {
-                // header tabs
                 spriteBatch.Draw(pixel, rectSideHeader, new Color(255,255,255,20));
                 DrawRect(rectSideHeader, new Color(255,255,255,60), 1);
 
@@ -1112,7 +1189,6 @@ private bool AreAdjacent(string fromId, string toId)
                     }
                 }
 
-                // contenido
                 var content = new Rectangle(rectSide.X + 10, rectSide.Y + SIDE_HEADER_H + 10, rectSide.Width - 20, rectSide.Height - SIDE_HEADER_H - 20);
                 DrawSideContent(content);
             }
@@ -1147,6 +1223,71 @@ private bool AreAdjacent(string fromId, string toId)
 
             spriteBatch.End();
             base.Draw(gameTime);
+        }
+
+        // ======== Lobby Draw ========
+        private void DrawLobby()
+        {
+            var W = graficos.PreferredBackBufferWidth;
+            var H = graficos.PreferredBackBufferHeight;
+
+            // fondo
+            var bg = menuBg ?? mapaVisible;
+            var scale = ComputeScaleToFit(bg.Width, bg.Height, W, H);
+            var pos = new Vector2((W - bg.Width * scale) * 0.5f, (H - bg.Height * scale) * 0.5f);
+            spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+
+            if (font != null)
+            {
+                string titulo = lobbyIsHost ? "Lobby (Host)" : "Lobby (Cliente)";
+                var size = font.MeasureString(titulo);
+                spriteBatch.DrawString(font, titulo, new Vector2((W - size.X) * 0.5f, 40), Color.White);
+
+                // caja jugadores
+                var box = new Rectangle(W/2 - 300, 120, 600, 320);
+                spriteBatch.Draw(pixel, box, new Color(0,0,0,140));
+                DrawRect(box, Color.White, 2);
+
+                int y = box.Y + 16;
+                spriteBatch.DrawString(font, "Jugadores:", new Vector2(box.X + 16, y), Color.White);
+                y += 28;
+
+                if (lobbyPlayers.Count == 0)
+                {
+                    spriteBatch.DrawString(font, "(vacio... esperando jugadores en la LAN)", new Vector2(box.X + 16, y), Color.White);
+                    y += 22;
+                }
+                else
+                {
+                    foreach (var p in lobbyPlayers)
+                    {
+                        spriteBatch.DrawString(font, "• " + p, new Vector2(box.X + 16, y), Color.White);
+                        y += 22;
+                    }
+                }
+
+                // botones
+                int bw = 280, bh = 42;
+                int cx = W / 2 - bw / 2;
+                int baseY = (int)(H * 0.70f);
+                var btnIniciar = new Rectangle(cx, baseY - (bh + 12), bw, bh);
+                var btnVolver  = new Rectangle(cx, baseY, bw, bh);
+
+                DrawUIButton(btnIniciar, lobbyIsHost ? "Iniciar partida" : "(esperando host)");
+                DrawUIButton(btnVolver, "Volver");
+            }
+        }
+
+        private void DrawUIButton(Rectangle r, string text)
+        {
+            spriteBatch.Draw(pixel, new Rectangle(r.X + 3, r.Y + 3, r.Width, r.Height), new Color(0,0,0,80));
+            spriteBatch.Draw(pixel, r, new Color(255,255,255,170));
+            DrawRect(r, new Color(0,0,0,200), 2);
+            if (font != null)
+            {
+                var size = font.MeasureString(text);
+                spriteBatch.DrawString(font, text, new Vector2(r.X + (r.Width - size.X) * 0.5f, r.Y + (r.Height - size.Y) * 0.5f), Color.Black);
+            }
         }
 
         // ======== Side Content ========
@@ -1186,36 +1327,22 @@ private bool AreAdjacent(string fromId, string toId)
                         if (btnPlus.Contains(p))  refuerzosStep = Math.Min(20, refuerzosStep + 1);
                     }
 
-                    // Botón "Colocar en territorio seleccionado"
                     var r2 = new Rectangle(area.X + 6, r1.Bottom + 10, area.Width - 12, 40);
                     DrawUIPrimaryButton(r2, "Colocar en territorio seleccionado");
 
                     var mouseNow = Mouse.GetState();
                     if (Clicked(r2, mouseNow))
                     {
-                        if (engine == null)
-                        {
-                            uiLog.Add("[ERR] Engine no inicializado.");
-                        }
-                        else if (engine.State.Phase != Phase.Reinforcement)
-                        {
-                            uiLog.Add("[WARN] No estás en fase de refuerzos.");
-                        }
-                        else if (territorioSeleccionado == null)
-                        {
-                            uiLog.Add("[INFO] Selecciona un territorio propio primero.");
-                        }
+                        if (engine == null) { uiLog.Add("[ERR] Engine no inicializado."); }
+                        else if (engine.State.Phase != Phase.Reinforcement) { uiLog.Add("[WARN] No estás en fase de refuerzos."); }
+                        else if (territorioSeleccionado == null) { uiLog.Add("[INFO] Selecciona un territorio propio primero."); }
                         else
                         {
                             int place = Math.Min(refuerzosStep, refuerzosPendientes);
-                            if (place <= 0)
-                            {
-                                uiLog.Add("[INFO] No hay refuerzos disponibles.");
-                            }
+                            if (place <= 0) { uiLog.Add("[INFO] No hay refuerzos disponibles."); }
                             else
                             {
-                                // SIM: quitamos la llamada a un método inexistente y mantenemos feedback en UI.
-uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementService para aplicar de verdad).");
+                                uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementService para aplicar de verdad).");
                             }
                         }
                     }
@@ -1227,7 +1354,6 @@ uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementSer
                 {
                     spriteBatch.DrawString(font, "Ataque", new Vector2(area.X + 6, area.Y + 6), Color.White);
 
-                    // Att/Def info (mostrar selección local)
                     var attBox = new Rectangle(area.X + 6, area.Y + 30, area.Width - 12, 54);
                     var defBox = new Rectangle(area.X + 6, attBox.Bottom + 6, area.Width - 12, 54);
                     spriteBatch.Draw(pixel, attBox, new Color(255,255,255,20));
@@ -1240,39 +1366,25 @@ uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementSer
                     spriteBatch.DrawString(font, $"Atacante: {att}", new Vector2(attBox.X + 8, attBox.Y + 8), Color.White);
                     spriteBatch.DrawString(font, $"Defensor : {def}", new Vector2(defBox.X + 8, defBox.Y + 8), Color.White);
 
-                    // Botón lanzar
                     var btn = new Rectangle(area.X + 6, defBox.Bottom + 10, area.Width - 12, 40);
                     DrawUIPrimaryButton(btn, "Lanzar dados");
                     var mouseNow2 = Mouse.GetState();
                     if (Clicked(btn, mouseNow2))
                     {
-                        if (engine == null)
-                        {
-                            uiLog.Add("[ERR] Engine no inicializado.");
-                        }
-                        else if (engine.State.Phase != Phase.Attack)
-                        {
-                            uiLog.Add("[WARN] No estás en fase de ataque.");
-                        }
-                        else if (attackFrom == null || attackTo == null)
-                        {
-                            uiLog.Add("[INFO] Selecciona atacante y defensor (click en mapa).");
-                        }
+                        if (engine == null) { uiLog.Add("[ERR] Engine no inicializado."); }
+                        else if (engine.State.Phase != Phase.Attack) { uiLog.Add("[WARN] No estás en fase de ataque."); }
+                        else if (attackFrom == null || attackTo == null) { uiLog.Add("[INFO] Selecciona atacante y defensor (click en mapa)."); }
                         else
                         {
-                            // Usamos el flujo ya integrado con el controlador para tirar dados/animación
-TryRollDiceFromEngine();
-
-// Si quieres limpiar selección tras cada tiro:
-if (lastRoll != null && lastRoll.TerritoryCaptured)
-{
-    attackFrom = null;
-    attackTo   = null;
-}
+                            TryRollDiceFromEngine();
+                            if (lastRoll != null && lastRoll.TerritoryCaptured)
+                            {
+                                attackFrom = null;
+                                attackTo   = null;
+                            }
                         }
                     }
 
-                    // Tira dados (presentación)
                     var strip = new Rectangle(area.X + 6, btn.Bottom + 8, area.Width - 12, 72);
                     DrawRect(strip, new Color(255,255,255,40), 1);
 
@@ -1287,7 +1399,6 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                         int x = strip.X + gap;
                         int y = strip.Y + (strip.Height - dieSize) / 2;
 
-                        // Att
                         for (int i = 0; i < nA; i++)
                         {
                             int val = Math.Clamp(diceShown[i], 1, 6);
@@ -1297,10 +1408,8 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                             x += dieSize + gap;
                         }
 
-                        // espacio
                         x += gap;
 
-                        // Def
                         for (int i = 0; i < nD; i++)
                         {
                             int val = Math.Clamp(diceShownDef[i], 1, 6);
@@ -1311,7 +1420,6 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                         }
                     }
 
-                    // Resultado
                     if (lastRoll != null)
                     {
                         var txt = $"Resultado: A-{lastRoll.AttackerLosses}  D-{lastRoll.DefenderLosses}" + (lastRoll.TerritoryCaptured ? "  Capturado" : "");
@@ -1329,7 +1437,6 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                     DrawRect(info, new Color(255,255,255,60), 1);
                     spriteBatch.DrawString(font, "Click en origen propio, luego destino propio conectado.", new Vector2(info.X + 8, info.Y + 12), Color.White);
 
-                    // Slider +/- (simple)
                     var row = new Rectangle(area.X + 6, info.Bottom + 8, area.Width - 12, 40);
                     spriteBatch.Draw(pixel, row, new Color(255,255,255,18));
                     DrawRect(row, new Color(255,255,255,60), 1);
@@ -1405,13 +1512,11 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
             lastRoll = r;
             uiLog.Add($"Tiro: A[{string.Join(",", r.AttackerDice)}] vs D[{string.Join(",", r.DefenderDice)}]  Perdidas A:{r.AttackerLosses} D:{r.DefenderLosses}" + (r.TerritoryCaptured ? " CAPTURADO" : ""));
 
-            // Inicia animación (actual)
             diceState = DiceState.Rolling;
             diceTimer = 0;
             for (int i = 0; i < diceShown.Length; i++) diceShown[i] = rng.Next(1, 7);
             for (int i = 0; i < diceShownDef.Length; i++) diceShownDef[i] = rng.Next(1, 7);
 
-            // Animator opcional
             int aCount = r.AttackerDice?.Length ?? 0;
             int dCount = r.DefenderDice?.Length ?? 0;
             diceAnimator?.Start(aCount, dCount, DICE_ROLL_DURATION);
@@ -1428,11 +1533,13 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
         // ======== Util draw ========
         private void DrawMenus()
         {
+            var W = graficos.PreferredBackBufferWidth;
+            var H = graficos.PreferredBackBufferHeight;
             var bg = menuBg ?? mapaVisible;
-            var scale = ComputeScaleToFit(bg.Width, bg.Height, graficos.PreferredBackBufferWidth, graficos.PreferredBackBufferHeight);
+            var scale = ComputeScaleToFit(bg.Width, bg.Height, W, H);
             var pos = new Vector2(
-                (graficos.PreferredBackBufferWidth - bg.Width * scale) * 0.5f,
-                (graficos.PreferredBackBufferHeight - bg.Height * scale) * 0.5f
+                (W - bg.Width * scale) * 0.5f,
+                (H - bg.Height * scale) * 0.5f
             );
             spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
@@ -1441,6 +1548,7 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                 AppState.MenuOpciones => botonesOpciones,
                 AppState.MenuJugar => botonesJugar,
                 AppState.MenuPersonajes => botonesPersonajes,
+                AppState.MenuMultiplayer => botonesMultiplayer,
                 _ => botonesMenu
             };
 
@@ -1450,9 +1558,7 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                 {
                     string titulo = "Selecciona tu personaje";
                     var size = font.MeasureString(titulo);
-                    spriteBatch.DrawString(font, titulo, new Vector2(
-                        (graficos.PreferredBackBufferWidth - size.X) * 0.5f,
-                        pos.Y + 16), Color.White);
+                    spriteBatch.DrawString(font, titulo, new Vector2((W - size.X) * 0.5f, pos.Y + 16), Color.White);
                 }
 
                 for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
@@ -1492,7 +1598,7 @@ if (lastRoll != null && lastRoll.TerritoryCaptured)
                 return;
             }
 
-            // Otros menús
+            // otros menús (incluye principal / opciones / jugar / multiplayer)
             for (int i = 0; i < lista.Count; i++)
             {
                 var b = lista[i];

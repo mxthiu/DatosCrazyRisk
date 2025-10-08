@@ -5,244 +5,106 @@ using CrazyRisk.Core;
 namespace CrazyRiskGame.Play.Controllers
 {
     /// <summary>
-    /// Controla la fase de Fortify: selección de origen/destino y movimiento de tropas.
-    /// No dibuja ni lee input crudo; recibe eventos de alto nivel desde la UI.
+    /// Controlador de fortificación (movimiento de tropas entre territorios propios).
+    /// No asume que el motor expone "Neighbors". Por eso admite un delegado opcional de adyacencia.
     /// </summary>
     public sealed class FortifyController
     {
         private readonly GameEngine _engine;
+        private readonly Func<string, string, bool>? _areAdjacent; // opcional: valida adyacencia si se provee
+        private readonly Action<string>? _log;
 
-        /// <summary>Territorio de origen (propio) seleccionado para mover tropas.</summary>
-        public string? FromId { get; private set; }
-
-        /// <summary>Territorio de destino (propio y conectado) seleccionado.</summary>
-        public string? ToId { get; private set; }
-
-        /// <summary>Cantidad a mover por defecto (controlado con +/- en la UI).</summary>
-        public int Amount { get; private set; } = 1;
-
-        public FortifyController(GameEngine engine)
+        /// <param name="engine">GameEngine actual</param>
+        /// <param name="areAdjacent">
+        /// Delegado opcional para validar que (fromId,toId) sean adyacentes (p.ej., tu Juego.AreAdjacent).
+        /// Si es null, no se valida adyacencia (solo propietario/cantidades).
+        /// </param>
+        /// <param name="logger">Logger opcional para UI</param>
+        public FortifyController(GameEngine engine, Func<string, string, bool>? areAdjacent = null, Action<string>? logger = null)
         {
             _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            _areAdjacent = areAdjacent;
+            _log = logger;
         }
 
         /// <summary>
-        /// La UI avisa que el jugador clickeó un territorio durante la fase Fortify.
-        /// Primer click: fija origen si es propio y tiene al menos 2 tropas.
-        /// Segundo click: fija destino si es propio y conectado por camino aliado.
-        /// Un tercer click en cualquier territorio propio “reinicia” y elige nuevo origen.
+        /// Mueve "amount" tropas desde "fromId" hacia "toId".
+        /// Reglas:
+        /// - Debe ser fase Fortify.
+        /// - Ambos territorios deben pertenecer al jugador actual.
+        /// - El origen debe tener > amount (deja mínimo 1).
+        /// - Si hay delegado de adyacencia, debe ser true.
         /// </summary>
-        public void HandleTerritoryClick(string territoryId, out string uiMessage)
+        public bool Move(string fromId, string toId, int amount, out string error)
         {
-            uiMessage = string.Empty;
+            error = string.Empty;
 
             if (_engine.State.Phase != Phase.Fortify)
             {
-                uiMessage = "No estás en fase de fortificación.";
-                return;
-            }
-
-            if (!_engine.State.Territories.TryGetValue(territoryId, out var t))
-            {
-                uiMessage = "Territorio inválido.";
-                return;
-            }
-
-            if (t.OwnerId != _engine.State.CurrentPlayerId)
-            {
-                uiMessage = "Debes elegir territorios propios.";
-                return;
-            }
-
-            // Si no hay origen, elegimos origen válido (≥2 tropas para poder mover al menos 1)
-            if (FromId is null)
-            {
-                if (t.Troops < 2)
-                {
-                    uiMessage = "El origen debe tener al menos 2 tropas.";
-                    return;
-                }
-
-                FromId = territoryId;
-                ToId = null;
-                ClampAmountToAvailable();
-                uiMessage = $"Origen: {FromId}. Ahora elige un destino propio conectado.";
-                return;
-            }
-
-            // Si tenemos origen pero no destino, intentamos fijar destino
-            if (ToId is null)
-            {
-                // Si clickea el mismo origen, limpiamos y volvemos a elegir
-                if (territoryId == FromId)
-                {
-                    FromId = null;
-                    ToId = null;
-                    uiMessage = "Origen deseleccionado. Elige un nuevo origen.";
-                    return;
-                }
-
-                // Debe estar conectado con camino aliado
-                if (!_engine.AreConnectedByOwnerPath(FromId, territoryId, _engine.State.CurrentPlayerId))
-                {
-                    uiMessage = "No hay camino propio entre origen y destino.";
-                    return;
-                }
-
-                ToId = territoryId;
-                ClampAmountToAvailable();
-                uiMessage = $"Destino: {ToId}. Usa (+/-) para ajustar y 'Confirmar' para mover.";
-                return;
-            }
-
-            // Si había origen y destino y clickea de nuevo, reinicia seleccionando nuevo origen
-            FromId = territoryId;
-            ToId = null;
-            if (_engine.State.Territories.TryGetValue(territoryId, out var nt) && nt.Troops >= 2)
-            {
-                ClampAmountToAvailable();
-                uiMessage = $"Nuevo origen: {FromId}. Elige destino propio conectado.";
-            }
-            else
-            {
-                FromId = null;
-                uiMessage = "El nuevo origen debe tener al menos 2 tropas.";
-            }
-        }
-
-        /// <summary>
-        /// Ajusta el Amount con +/- limitado a lo que se puede mover (disponible en origen).
-        /// </summary>
-        public void BumpAmount(int delta)
-        {
-            Amount = Math.Clamp(Amount + delta, 1, 999);
-            ClampAmountToAvailable();
-        }
-
-        /// <summary>
-        /// Intenta ejecutar el movimiento de tropas.
-        /// </summary>
-        public bool TryMove(out string uiMessage)
-        {
-            uiMessage = string.Empty;
-
-            if (_engine.State.Phase != Phase.Fortify)
-            {
-                uiMessage = "No estás en fase de fortificación.";
-                return false;
-            }
-            if (FromId is null) { uiMessage = "Falta elegir origen."; return false; }
-            if (ToId is null)   { uiMessage = "Falta elegir destino."; return false; }
-
-            // No permitir dejar el origen en 0 tropas
-            if (!_engine.State.Territories.TryGetValue(FromId, out var fromT))
-            {
-                uiMessage = "Origen inválido.";
+                error = "No estás en fase de movimiento.";
                 return false;
             }
 
-            int maxMovible = Math.Max(0, fromT.Troops - 1);
-            if (maxMovible <= 0)
+            if (string.IsNullOrWhiteSpace(fromId) || string.IsNullOrWhiteSpace(toId) || fromId == toId)
             {
-                uiMessage = "No hay tropas movibles (debes dejar al menos 1 en origen).";
+                error = "Par de territorios inválido.";
                 return false;
             }
 
-            int amount = Math.Clamp(Amount, 1, maxMovible);
-
-            if (_engine.FortifyMove(FromId, ToId, amount, out string err))
+            if (amount <= 0)
             {
-                uiMessage = $"Movimiento: {FromId} → {ToId} (+{amount}).";
-                // Después de mover, muchas reglas permiten un solo movimiento por turno.
-                // No limpiamos automáticamente por si la UI quiere mostrar el resultado hasta que el jugador pulse Siguiente.
-                ClampAmountToAvailable();
-                return true;
+                error = "La cantidad a mover debe ser positiva.";
+                return false;
             }
 
-            uiMessage = "No se pudo mover: " + err;
-            return false;
-        }
+            var state = _engine.State;
 
-        /// <summary>
-        /// Limpia selección (por ejemplo al pulsar “Cancelar” en la UI).
-        /// </summary>
-        public void ClearSelection()
-        {
-            FromId = null;
-            ToId = null;
-            Amount = 1;
-        }
-
-        /// <summary>
-        /// Expone un snapshot para pintar la UI.
-        /// </summary>
-        public FortifyView GetView()
-        {
-            int fromTroops = 0;
-            int toTroops = 0;
-            bool pathOk = false;
-
-            if (FromId != null && _engine.State.Territories.TryGetValue(FromId, out var f))
-                fromTroops = f.Troops;
-
-            if (ToId != null && _engine.State.Territories.TryGetValue(ToId, out var t))
-                toTroops = t.Troops;
-
-            if (FromId != null && ToId != null)
-                pathOk = _engine.AreConnectedByOwnerPath(FromId, ToId, _engine.State.CurrentPlayerId);
-
-            int maxMovible = Math.Max(0, fromTroops - 1);
-
-            return new FortifyView(
-                currentPlayerId: _engine.State.CurrentPlayerId,
-                fromId: FromId,
-                toId: ToId,
-                fromTroops: fromTroops,
-                toTroops: toTroops,
-                maxMovableFrom: maxMovible,
-                amount: Math.Clamp(Amount, 1, Math.Max(1, maxMovible)),
-                pathOk: pathOk
-            );
-        }
-
-        private void ClampAmountToAvailable()
-        {
-            if (FromId != null && _engine.State.Territories.TryGetValue(FromId, out var f))
+            if (!state.Territories.TryGetValue(fromId, out var from))
             {
-                int maxMovible = Math.Max(0, f.Troops - 1);
-                Amount = Math.Clamp(Amount, 1, Math.Max(1, maxMovible));
+                error = "Territorio origen inexistente.";
+                return false;
             }
-            else
+            if (!state.Territories.TryGetValue(toId, out var to))
             {
-                Amount = 1;
+                error = "Territorio destino inexistente.";
+                return false;
             }
-        }
-    }
 
-    /// <summary>
-    /// DTO de sólo lectura para la UI de fortificación.
-    /// </summary>
-    public readonly struct FortifyView
-    {
-        public int CurrentPlayerId { get; }
-        public string? FromId { get; }
-        public string? ToId { get; }
-        public int FromTroops { get; }
-        public int ToTroops { get; }
-        public int MaxMovableFrom { get; }
-        public int Amount { get; }
-        public bool PathOk { get; }
+            int player = state.CurrentPlayerId;
 
-        public FortifyView(int currentPlayerId, string? fromId, string? toId, int fromTroops, int toTroops, int maxMovableFrom, int amount, bool pathOk)
-        {
-            CurrentPlayerId = currentPlayerId;
-            FromId = fromId;
-            ToId = toId;
-            FromTroops = fromTroops;
-            ToTroops = toTroops;
-            MaxMovableFrom = maxMovableFrom;
-            Amount = amount;
-            PathOk = pathOk;
+            if (from.OwnerId != player || to.OwnerId != player)
+            {
+                error = "Ambos territorios deben ser tuyos.";
+                return false;
+            }
+
+            if (from.Troops <= 1)
+            {
+                error = "El origen debe tener más de 1 tropa.";
+                return false;
+            }
+
+            // Si tenemos validador de adyacencia, úsalo
+            if (_areAdjacent != null && !_areAdjacent(fromId, toId))
+            {
+                error = "El destino no es adyacente al origen.";
+                return false;
+            }
+
+            // Asegurar que no dejo el origen en 0
+            int maxMovibles = Math.Max(0, from.Troops - 1);
+            int move = Math.Min(amount, maxMovibles);
+            if (move <= 0)
+            {
+                error = "No hay tropas suficientes para mover (debe quedar al menos 1 en el origen).";
+                return false;
+            }
+
+            from.Troops -= move;
+            to.Troops   += move;
+
+            _log?.Invoke($"Fortificar: {fromId} -> {toId} ({move}).");
+            return true;
         }
     }
 }

@@ -5,114 +5,162 @@ using CrazyRisk.Core;
 namespace CrazyRiskGame.Play.Controllers
 {
     /// <summary>
-    /// Orquesta la fase de Ataque para la UI.
-    /// Se apoya directamente en CrazyRisk.Core.GameEngine para evitar
-    /// dependencias con adapters/servicios que puedan variar entre ramas.
+    /// Resuelve un ataque estilo Risk sobre el GameEngine.
+    /// - Adyacencia y selección se validan en la UI (Juego.cs).
+    /// - Aplica pérdidas y captura territorio si llega a 0 tropas.
+    /// - Devuelve CrazyRisk.Core.DiceRollResult (sin tipos duplicados).
     /// </summary>
     public sealed class AttackController
     {
         private readonly GameEngine _engine;
+        private readonly Random _rng = new();
 
-        // Servicio de selección es opcional; si no lo tienes, pásalo como null.
-        private readonly object? _selectionService;
-        private readonly Action<string>? _setSelectedCallback;
+        private string? _attackerId;
+        private string? _defenderId;
 
-        /// <param name="engine">Instancia del motor del juego (GameEngine).</param>
-        /// <param name="selectionService">
-        /// Servicio opcional de selección (si lo tienes). Puedes pasar null.
-        /// Si lo pasas y expones un método SetSelected(string), pásalo con setSelectedCallback.
-        /// </param>
-        /// <param name="setSelectedCallback">
-        /// Callback opcional para marcar selección en la UI. Si no tienes SelectionService, deja null.
-        /// </param>
-        public AttackController(GameEngine engine, object? selectionService = null, Action<string>? setSelectedCallback = null)
+        private readonly Action<string>? _log;
+
+        public AttackController(GameEngine engine, object? _unused, Action<string>? logger = null)
         {
             _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-            _selectionService = selectionService;
-            _setSelectedCallback = setSelectedCallback;
+            _log    = logger;
         }
 
-        public bool InAttackPhase => _engine.State.Phase == Phase.Attack;
-        public string? PendingFrom => _engine.State.PendingAttackFrom;
-        public string? PendingTo   => _engine.State.PendingAttackTo;
-
-        /// <summary>
-        /// Selecciona el territorio atacante (debe ser del jugador actual y tener >= 2 tropas).
-        /// Limpia el defensor pendiente.
-        /// </summary>
-        public bool SelectAttacker(string territoryId, out string error)
+        public void SetPair(string attackerId, string defenderId)
         {
-            error = "";
-            var st = _engine.State;
-            if (st.Phase != Phase.Attack) { error = "No estás en fase de ataque."; return false; }
-
-            if (!st.Territories.TryGetValue(territoryId, out var t))
-            { error = "Territorio atacante inválido."; return false; }
-
-            if (t.OwnerId != st.CurrentPlayerId)
-            { error = "Debes elegir un territorio propio como atacante."; return false; }
-
-            if (t.Troops < 2)
-            { error = "Necesitas al menos 2 tropas para atacar."; return false; }
-
-            st.PendingAttackFrom = territoryId;
-            st.PendingAttackTo = null;
-
-            // Notifica selección (si hay callback/servicio)
-            _setSelectedCallback?.Invoke(territoryId);
-            return true;
+            _attackerId = attackerId;
+            _defenderId = defenderId;
         }
 
-        /// <summary>
-        /// Selecciona el territorio defensor (enemigo y adyacente al atacante actual).
-        /// </summary>
-        public bool SelectDefender(string territoryId, out string error)
+        public void ClearSelection()
         {
-            error = "";
-            var st = _engine.State;
-            if (st.Phase != Phase.Attack) { error = "No estás en fase de ataque."; return false; }
-            if (st.PendingAttackFrom == null) { error = "Primero elige un atacante."; return false; }
-
-            if (!st.Territories.TryGetValue(territoryId, out var def))
-            { error = "Territorio defensor inválido."; return false; }
-
-            if (def.OwnerId == st.CurrentPlayerId)
-            { error = "No puedes atacar un territorio propio."; return false; }
-
-            // Verificamos adyacencia usando el propio motor.
-            if (!_engine.AreAdjacent(st.PendingAttackFrom, territoryId))
-            { error = "Los territorios no son adyacentes."; return false; }
-
-            st.PendingAttackTo = territoryId;
-            _setSelectedCallback?.Invoke(territoryId);
-            return true;
+            _attackerId = null;
+            _defenderId = null;
         }
 
-        /// <summary>
-        /// Ejecuta una tirada (máximo 3 dados atacante, 2 defensor).
-        /// Devuelve DiceRollResult si fue válida; si no, error con el motivo.
-        /// </summary>
         public bool RollOnce(out DiceRollResult? result, out string error)
         {
+            if (_attackerId == null || _defenderId == null)
+            {
+                result = null;
+                error = "Selecciona atacante y defensor en el mapa.";
+                return false;
+            }
+            return RollOnce(_attackerId, _defenderId, out result, out error);
+        }
+
+        public bool RollOnce(string attackerId, string defenderId, out DiceRollResult? result, out string error)
+        {
             result = null;
-            error = "";
+            error  = string.Empty;
 
             if (_engine.State.Phase != Phase.Attack)
-            { error = "No estás en fase de ataque."; return false; }
+            {
+                error = "No estás en fase de ataque.";
+                return false;
+            }
 
-            var r = _engine.RollAttackOnce(out error);
-            if (r == null) return false;
+            var state = _engine.State;
 
-            result = r;
+            if (!state.Territories.TryGetValue(attackerId, out var att))
+            {
+                error = "Atacante inexistente.";
+                return false;
+            }
+            if (!state.Territories.TryGetValue(defenderId, out var def))
+            {
+                error = "Defensor inexistente.";
+                return false;
+            }
+
+            if (att.OwnerId != state.CurrentPlayerId)
+            {
+                error = "El atacante no te pertenece.";
+                return false;
+            }
+            if (def.OwnerId == state.CurrentPlayerId)
+            {
+                error = "No puedes atacar un territorio propio.";
+                return false;
+            }
+            if (att.Troops <= 1)
+            {
+                error = "El atacante necesita más de 1 tropa para atacar.";
+                return false;
+            }
+
+            int attackerDice = Math.Clamp(att.Troops - 1, 1, 3);
+            int defenderDice = Math.Clamp(def.Troops,       1, 2);
+
+            int[] aRolls = RollDice(attackerDice);
+            int[] dRolls = RollDice(defenderDice);
+
+            Array.Sort(aRolls); Array.Reverse(aRolls);
+            Array.Sort(dRolls); Array.Reverse(dRolls);
+
+            int comps = Math.Min(aRolls.Length, dRolls.Length);
+            int aLosses = 0, dLosses = 0;
+            for (int i = 0; i < comps; i++)
+            {
+                if (aRolls[i] > dRolls[i]) dLosses++;
+                else                       aLosses++;
+            }
+
+            int aRemove = Math.Min(aLosses, att.Troops - 1);
+            int dRemove = Math.Min(dLosses, def.Troops);
+
+            att.Troops -= aRemove;
+            def.Troops -= dRemove;
+
+            bool captured = false;
+
+            if (def.Troops <= 0)
+            {
+                captured = true;
+
+                int move = Math.Max(1, Math.Min(attackerDice, att.Troops - 1));
+                if (move > 0)
+                {
+                    att.Troops -= move;
+                    def.Troops  = move;
+                }
+                else
+                {
+                    if (att.Troops > 1)
+                    {
+                        att.Troops -= 1;
+                        def.Troops  = 1;
+                    }
+                    else
+                    {
+                        def.Troops = 1;
+                    }
+                }
+
+                def.OwnerId = att.OwnerId;
+                _log?.Invoke($"Capturado: {defenderId}. {move} tropas movidas.");
+            }
+
+            result = new DiceRollResult
+            {
+                AttackerDice      = aRolls,
+                DefenderDice      = dRolls,
+                AttackerLosses    = aRemove,
+                DefenderLosses    = dRemove,
+                TerritoryCaptured = captured
+            };
+
+            _attackerId = attackerId;
+            _defenderId = defenderId;
             return true;
         }
 
-        /// <summary>
-        /// Resetea la selección de defensor (p.ej. si el usuario cambia de atacante).
-        /// </summary>
-        public void ClearDefender()
+        private int[] RollDice(int count)
         {
-            _engine.State.PendingAttackTo = null;
+            var arr = new int[count];
+            for (int i = 0; i < count; i++)
+                arr[i] = _rng.Next(1, 7);
+            return arr;
         }
     }
 }
