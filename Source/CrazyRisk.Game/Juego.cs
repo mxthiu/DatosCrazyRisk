@@ -412,10 +412,18 @@ namespace CrazyRiskGame
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 4, bw, bh), Text = "Volver" });
 
             // Jugar (agrego opción Multiplayer)
-            int jy = H / 2 - (bh * 3 + gap * 2) / 2;
+            // Jugar (agrego Host/Client separados)
+            int jy = H / 2 - (bh * 4 + gap * 3) / 2;
+
             botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 0, bw, bh), Text = "Partida rapida" });
-            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 1, bw, bh), Text = "Multiplayer (LAN)" });
-            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 2, bw, bh), Text = "Volver" });
+
+
+            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 1, bw, bh), Text = "Crear lobby (Host)" });
+            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 2, bw, bh), Text = "Unirse a lobby (Cliente)" });
+
+            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 3, bw, bh), Text = "Volver" });
+
+
 
             // Personajes (grid 3x2)
             int cols = 3, rows = 2;
@@ -869,10 +877,13 @@ namespace CrazyRiskGame
                     if (botonesJugar[0].Bounds.Contains(pos))
                     { selectedAvatarIndex = -1; CambiarEstado(AppState.MenuPersonajes); }
                     else if (botonesJugar[1].Bounds.Contains(pos))
-                    { StartLobbyHost(); /* o StartLobbyClient(); si quieres entrar como cliente */ }
+                    { StartLobbyHost(); }                     // ← Host
                     else if (botonesJugar[2].Bounds.Contains(pos))
+                    { StartLobbyClient(); }                   // ← Cliente
+                    else if (botonesJugar[3].Bounds.Contains(pos))
                     { CambiarEstado(AppState.MenuPrincipal); }
                 }
+
                 else if (estado == AppState.MenuPersonajes)
                 {
                     for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
