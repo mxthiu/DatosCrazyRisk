@@ -7,53 +7,82 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 
-namespace CrazyRiskGame.Play.Net
+namespace CrazyRiskGame.Net.Lan
 {
     /// <summary>
-    /// Lobby LAN simple (host + hasta 2 clientes).
-    /// Descubrimiento por broadcast UDP y sincronización por UDP.
+    /// Lobby LAN por UDP (broadcast). Host + 2 clientes (3 jugadores).
+    /// - Descubrimiento: cliente envía DISCOVER (broadcast) y host responde con DISCOVER_REPLY.
+    /// - Unión y control: todo por UDP (al mismo puerto); el host mantiene el estado y lo “empuja”.
+    ///
+    /// Protocolo (sobre JSON):
+    ///   Envelope: { "t": int, "p": string }  // t = PacketType, p = payload JSON
+    ///
+    ///   DISCOVER (client→broadcast):          { }
+    ///   DISCOVER_REPLY (host→client unicast): { host, players, locked[] }
+    ///
+    ///   JOIN_REQUEST (client→host):           { name, avatar }
+    ///   JOIN_APPROVED (host→client):          { ok, slot, reason? }
+    ///
+    ///   CHANGE_AVATAR (client→host):          { avatar }
+    ///   READY (client→host):                  { ready }
+    ///   LEAVE (client→host):                  { }
+    ///
+    ///   STATE (host→client):                  LobbyState completo
+    ///   STATE_REQUEST (client→host):          { } (cliente fuerza “push” de estado)
     /// </summary>
     public sealed class LanLobby : IDisposable
     {
-        // ------------------- Config red -------------------
-        public const int BROADCAST_PORT = 33333;   // descubrimiento y control
-        public const int TICK_MS        = 100;     // frecuencia de envío estado host
-        public const int TIMEOUT_MS     = 5000;    // timeout para clientes “muertos”
+        // ========================= Config de red =========================
+        public const int BROADCAST_PORT = 33333;  // puerto UDP compartido
+        private const int RX_TIMEOUT_MS = 200;    // tiempo de espera en Receive()
+        public const int TICK_MS = 100;           // periodo de broadcast de estado del host
+        public const int TIMEOUT_MS = 5000;       // desconexión por inactividad
 
-        // ------------------- Rol actual -------------------
+        // ========================= Rol / Estado =========================
         public LobbyRole Role { get; private set; } = LobbyRole.None;
-
-        // ------------------- Estado compartido -------------------
         public LobbyState State { get; private set; } = new();
 
-        // Identidad local (nombre y avatar deseado)
         public string LocalName { get; private set; } = $"Player-{Environment.MachineName}";
         public int LocalAvatar { get; private set; } = -1;
         public bool LocalReady { get; private set; } = false;
 
-        // Red
+        // ========================= Red / Threads =========================
         private UdpClient? udp;
         private IPEndPoint anyEP = new IPEndPoint(IPAddress.Any, 0);
-
-        // Hilo de RX
         private Thread? rxThread;
         private volatile bool stopping;
 
-        // Host: última transmisión de estado
+        // Host
         private long lastBroadcastTicks;
 
-        // Cliente: host seleccionado (descubierto)
+        // Client
         private IPEndPoint? connectedHost;
 
-        // Mutex
-        private readonly object sync = new object();
+        // Sync
+        private readonly object sync = new();
 
-        // =================== API pública ===================
+        // ========================= Eventos UI =========================
+        /// <summary> Cambios generales de modo/rol/state. </summary>
+        public event Action? OnStateChanged;
 
-        /// <summary> Host: inicia lobby como servidor. </summary>
+        /// <summary> Lista de jugadores cambió (nombres, avatars, ready). </summary>
+        public event Action? OnPlayersChanged;
+
+        /// <summary> Logs útiles para depurar/red. </summary>
+        public event Action<string>? OnLog;
+
+        /// <summary> Disparado cuando el host establece GameStarting=true. </summary>
+        public event Action? OnGameStarting;
+
+        // =================================================================
+        // ======================== API PÚBLICA =============================
+        // =================================================================
+
+        /// <summary>Arranca como HOST (slot 0 ocupado por el host). Devuelve true si OK.</summary>
         public bool StartHost(string hostDisplayName = "Host")
         {
-            Stop();
+            Stop(); // limpiar cualquier sesión previa
+
             try
             {
                 udp = new UdpClient(AddressFamily.InterNetwork);
@@ -63,7 +92,7 @@ namespace CrazyRiskGame.Play.Net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[LOBBY] No se pudo abrir puerto UDP: " + ex.Message);
+                OnLog?.Invoke("[LOBBY] UDP bind host falló: " + ex.Message);
                 Stop();
                 return false;
             }
@@ -74,68 +103,76 @@ namespace CrazyRiskGame.Play.Net
                 HostName = string.IsNullOrWhiteSpace(hostDisplayName) ? "Host" : hostDisplayName
             };
 
-            // Host ocupa slot 0
+            // El host ocupa el slot 0
             State.Players[0] = new PlayerSlot
             {
                 Id = 0,
                 Name = State.HostName,
-                AvatarId = LocalAvatar,    // -1 = sin elegir
+                AvatarId = LocalAvatar, // -1 = sin elegir
                 Ready = false,
                 IsHost = true,
                 LastSeenUtcMs = NowMs()
             };
 
             StartRxThread();
-            Console.WriteLine("[LOBBY] Host iniciado en UDP:" + BROADCAST_PORT);
+
+            OnLog?.Invoke($"[LOBBY] Host escuchando UDP:{BROADCAST_PORT}");
+            OnStateChanged?.Invoke();
+            OnPlayersChanged?.Invoke();
             return true;
         }
 
-        /// <summary> Cliente: entra al modo discovery; se auto-conecta al primer host visible cuando llames JoinHost(). </summary>
+        /// <summary>Arranca como CLIENTE (modo descubrimiento). Devuelve true si OK.</summary>
         public bool StartClient(string displayName)
         {
             if (string.IsNullOrWhiteSpace(displayName))
                 displayName = $"Player-{Environment.MachineName}";
 
             Stop();
+
             try
             {
                 udp = new UdpClient(AddressFamily.InterNetwork);
                 udp.EnableBroadcast = true;
                 udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                // NO bind al puerto del host; recibir en cualquiera:
+                // Recibir desde cualquier puerto ephemeral (no colisionar con host)
                 udp.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[LOBBY] No se pudo abrir UDP cliente: " + ex.Message);
+                OnLog?.Invoke("[LOBBY] UDP cliente falló: " + ex.Message);
                 Stop();
                 return false;
             }
 
             Role = LobbyRole.Client;
             LocalName = displayName;
+            LocalReady = false;
+            LocalAvatar = -1;
             State = new LobbyState();
 
             StartRxThread();
-            Console.WriteLine("[LOBBY] Cliente iniciado.");
+
+            OnLog?.Invoke("[LOBBY] Cliente listo para descubrir hosts.");
+            OnStateChanged?.Invoke();
             return true;
         }
 
-        /// <summary> Cliente: descubre host vía broadcast. Devuelve lista de hosts avistados en ~400ms. </summary>
-        public List<DiscoveredHost> DiscoverHosts(int windowMs = 400)
+        /// <summary>Cliente: envía DISCOVER (broadcast) y escucha ~windowMs los DISCOVER_REPLY.</summary>
+        public List<DiscoveredHost> DiscoverHosts(int windowMs = 450)
         {
             var list = new List<DiscoveredHost>();
             if (udp == null || Role != LobbyRole.Client) return list;
 
             try
             {
-                // Enviar “DISCOVER”
+                // Enviar DISCOVER
                 var pkt = MakePacket(PacketType.Discover, new { name = LocalName });
                 udp.Send(pkt, pkt.Length, new IPEndPoint(IPAddress.Broadcast, BROADCAST_PORT));
 
                 // Ventana de escucha
                 var until = Environment.TickCount64 + windowMs;
-                udp.Client.ReceiveTimeout = 100;
+                udp.Client.ReceiveTimeout = Math.Min(150, windowMs);
 
                 while (Environment.TickCount64 < until)
                 {
@@ -160,15 +197,19 @@ namespace CrazyRiskGame.Play.Net
                             }
                         }
                     }
-                    catch { /*silencio*/ }
+                    catch (SocketException) { /* timeout parcial: seguir */ }
+                    catch { /* ignorar */ }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                OnLog?.Invoke("[LOBBY] Discover error: " + ex.Message);
+            }
 
             return list;
         }
 
-        /// <summary> Cliente: se une a un host (el primero de DiscoverHosts o uno específico). </summary>
+        /// <summary>Cliente: solicita unirse a un host descubierto. El host contestará JOIN_APPROVED.</summary>
         public void JoinHost(IPEndPoint hostEndPoint, int desiredAvatar)
         {
             if (Role != LobbyRole.Client || udp == null) return;
@@ -177,15 +218,13 @@ namespace CrazyRiskGame.Play.Net
             LocalReady = false;
             connectedHost = hostEndPoint;
 
-            var join = new
-            {
-                name = LocalName,
-                avatar = LocalAvatar
-            };
+            var join = new { name = LocalName, avatar = LocalAvatar };
             SendToHost(PacketType.JoinRequest, join);
+
+            OnLog?.Invoke($"[LOBBY] Join request → {hostEndPoint.Address}");
         }
 
-        /// <summary> Cliente: cambia avatar (si el host lo acepta). </summary>
+        /// <summary>Cliente: solicita cambio de avatar.</summary>
         public void RequestAvatar(int desiredAvatar)
         {
             if (Role != LobbyRole.Client || udp == null || connectedHost == null) return;
@@ -193,65 +232,75 @@ namespace CrazyRiskGame.Play.Net
             SendToHost(PacketType.ChangeAvatar, new { avatar = desiredAvatar });
         }
 
-        /// <summary> Cliente: set ready. </summary>
+        /// <summary>Marca listo/no listo. En host actualiza slot 0; en cliente envía READY al host.</summary>
         public void SetReady(bool ready)
         {
             LocalReady = ready;
+
             if (Role == LobbyRole.Client && udp != null)
+            {
                 SendToHost(PacketType.Ready, new { ready });
+            }
             else if (Role == LobbyRole.Host)
             {
-                // Host es slot 0
                 lock (sync)
                 {
                     State.Players[0].Ready = ready;
                     BroadcastState();
+                    OnPlayersChanged?.Invoke();
                 }
             }
         }
 
-        /// <summary> Host: inicia partida (si todos ready). </summary>
+        /// <summary>Host: inicia la partida si todos están “ready”. Pone GameStarting=true y lanza evento.</summary>
         public bool HostStartGame()
         {
             if (Role != LobbyRole.Host) return false;
             lock (sync)
             {
-                if (!State.AllReady()) return false;
+                if (!State.AllReady())
+                {
+                    OnLog?.Invoke("[LOBBY] No todos están READY.");
+                    return false;
+                }
                 State.GameStarting = true;
                 BroadcastState();
             }
+            OnLog?.Invoke("[LOBBY] GameStarting=TRUE (anunciado a clientes).");
+            OnGameStarting?.Invoke(); // la UI debe cambiar a la pantalla de juego
             return true;
         }
 
-        /// <summary> Llamar periódicamente desde tu Update(). </summary>
+        /// <summary>Debe ser llamado periódicamente desde Game.Update() cuando eres host.</summary>
         public void Update()
         {
-            if (Role == LobbyRole.Host)
-            {
-                lock (sync)
-                {
-                    // Kick clientes con timeout
-                    long now = NowMs();
-                    for (int i = 1; i < 3; i++)
-                    {
-                        if (!State.Players[i].IsOccupied) continue;
-                        if (now - State.Players[i].LastSeenUtcMs > TIMEOUT_MS)
-                        {
-                            Console.WriteLine($"[LOBBY] Cliente timeout: slot {i}");
-                            State.Players[i] = PlayerSlot.Empty(i);
-                        }
-                    }
+            if (Role != LobbyRole.Host) return;
 
-                    // Enviar estado cada TICK
-                    if (Environment.TickCount64 - lastBroadcastTicks > TICK_MS)
+            lock (sync)
+            {
+                // Expulsar por timeout
+                long now = NowMs();
+                for (int i = 1; i < 3; i++)
+                {
+                    if (!State.Players[i].IsOccupied) continue;
+                    if (now - State.Players[i].LastSeenUtcMs > TIMEOUT_MS)
                     {
-                        BroadcastState();
-                        lastBroadcastTicks = Environment.TickCount64;
+                        OnLog?.Invoke($"[LOBBY] Timeout en slot {i}, liberando.");
+                        State.Players[i] = PlayerSlot.Empty(i);
+                        OnPlayersChanged?.Invoke();
                     }
+                }
+
+                // Broadcast de estado
+                if (Environment.TickCount64 - lastBroadcastTicks > TICK_MS)
+                {
+                    BroadcastState();
+                    lastBroadcastTicks = Environment.TickCount64;
                 }
             }
         }
 
+        /// <summary>Cliente: abandona. Host: resetea lobby.</summary>
         public void Leave()
         {
             if (Role == LobbyRole.Client && connectedHost != null)
@@ -267,18 +316,27 @@ namespace CrazyRiskGame.Play.Net
             try
             {
                 stopping = true;
-                if (rxThread != null && rxThread.IsAlive) rxThread.Join(200);
+                if (rxThread != null && rxThread.IsAlive) rxThread.Join(250);
             }
             catch { }
             try { udp?.Close(); } catch { }
             try { udp?.Dispose(); } catch { }
             udp = null;
+
             rxThread = null;
             Role = LobbyRole.None;
             connectedHost = null;
+
+            // No destruimos State para que la UI pueda leer último estado;
+            // si quieres reset duro, descomenta:
+            // State = new LobbyState();
+
+            OnStateChanged?.Invoke();
         }
 
-        // =================== RX/TX ===================
+        // =================================================================
+        // ======================= RX / TX Interno ==========================
+        // =================================================================
 
         private void StartRxThread()
         {
@@ -290,7 +348,7 @@ namespace CrazyRiskGame.Play.Net
         private void RxLoop()
         {
             if (udp == null) return;
-            udp.Client.ReceiveTimeout = 200;
+            udp.Client.ReceiveTimeout = RX_TIMEOUT_MS;
 
             while (!stopping)
             {
@@ -298,16 +356,21 @@ namespace CrazyRiskGame.Play.Net
                 {
                     var buf = udp.Receive(ref anyEP);
                     var msg = Encoding.UTF8.GetString(buf);
-                    if (!TryParsePacket(msg, out var type, out var payload)) continue;
+
+                    if (!TryParsePacket(msg, out var type, out var payload))
+                        continue;
 
                     if (Role == LobbyRole.Host)
                         HandleAsHost(type, payload, anyEP);
                     else if (Role == LobbyRole.Client)
                         HandleAsClient(type, payload, anyEP);
                 }
-                catch (SocketException) { /* timeout; seguir */ }
+                catch (SocketException) { /* timeout -> seguir */ }
                 catch (ObjectDisposedException) { break; }
-                catch (Exception ex) { Console.WriteLine("[LOBBY RX] " + ex.Message); }
+                catch (Exception ex)
+                {
+                    OnLog?.Invoke("[RX] " + ex.Message);
+                }
             }
         }
 
@@ -319,7 +382,6 @@ namespace CrazyRiskGame.Play.Net
                 {
                     case PacketType.Discover:
                     {
-                        // Responder con info resumida del lobby
                         var reply = new DiscoverReply
                         {
                             host = State.HostName ?? "Host",
@@ -336,7 +398,6 @@ namespace CrazyRiskGame.Play.Net
                         var req = JsonSerializer.Deserialize<JoinRequest>(payload);
                         if (req == null) break;
 
-                        // Primer slot libre (1..2)
                         int slot = State.FirstFreeSlot();
                         var approved = new JoinApproved
                         {
@@ -357,9 +418,10 @@ namespace CrazyRiskGame.Play.Net
                                 Ready = false,
                                 IsHost = false,
                                 LastSeenUtcMs = NowMs(),
-                                Remote = from
+                                Remote = new IPEndPoint(from.Address, BROADCAST_PORT)
                             };
                             BroadcastState();
+                            OnPlayersChanged?.Invoke();
                         }
                         break;
                     }
@@ -377,6 +439,7 @@ namespace CrazyRiskGame.Play.Net
 
                         State.Players[slot].LastSeenUtcMs = NowMs();
                         BroadcastState();
+                        OnPlayersChanged?.Invoke();
                         break;
                     }
 
@@ -391,6 +454,7 @@ namespace CrazyRiskGame.Play.Net
                         State.Players[slot].Ready = rd.ready;
                         State.Players[slot].LastSeenUtcMs = NowMs();
                         BroadcastState();
+                        OnPlayersChanged?.Invoke();
                         break;
                     }
 
@@ -401,7 +465,16 @@ namespace CrazyRiskGame.Play.Net
                         {
                             State.Players[slot] = PlayerSlot.Empty(slot);
                             BroadcastState();
+                            OnPlayersChanged?.Invoke();
                         }
+                        break;
+                    }
+
+                    case PacketType.StateRequest:
+                    {
+                        // cliente pide estado forzado (por latencia al entrar)
+                        var force = MakePacket(PacketType.State, State);
+                        udp?.Send(force, force.Length, from);
                         break;
                     }
                 }
@@ -419,14 +492,14 @@ namespace CrazyRiskGame.Play.Net
 
                     if (ok.ok && ok.slot >= 0)
                     {
-                        // Conectado: guardar “host”
                         connectedHost = new IPEndPoint(from.Address, BROADCAST_PORT);
-                        // Pedir estado al host (lo enviará periódicamente, pero forzamos)
+                        // pedir estado de arranque
                         SendToHost(PacketType.StateRequest, new { });
+                        OnLog?.Invoke("[LOBBY] Join aprobado. Slot=" + ok.slot);
                     }
                     else
                     {
-                        Console.WriteLine("[LOBBY] Join rechazado: " + (ok.reason ?? "desconocido"));
+                        OnLog?.Invoke("[LOBBY] Join rechazado: " + (ok.reason ?? "desconocido"));
                         connectedHost = null;
                     }
                     break;
@@ -436,7 +509,13 @@ namespace CrazyRiskGame.Play.Net
                 {
                     var st = JsonSerializer.Deserialize<LobbyState>(payload);
                     if (st != null)
+                    {
                         lock (sync) State = st;
+                        OnPlayersChanged?.Invoke();
+
+                        if (st.GameStarting)
+                            OnGameStarting?.Invoke();
+                    }
                     break;
                 }
             }
@@ -445,16 +524,13 @@ namespace CrazyRiskGame.Play.Net
         private void BroadcastState()
         {
             if (udp == null) return;
-
-            // A todos los clientes conocidos
             var pkt = MakePacket(PacketType.State, State);
 
-            // Enviar a cada “Remote” válido
+            // enviar a cada cliente conocido (slots 1..2)
             for (int i = 1; i < 3; i++)
             {
                 var p = State.Players[i];
                 if (!p.IsOccupied || p.Remote == null) continue;
-
                 try { udp.Send(pkt, pkt.Length, p.Remote); } catch { }
             }
         }
@@ -466,15 +542,13 @@ namespace CrazyRiskGame.Play.Net
             try { udp.Send(pkt, pkt.Length, connectedHost); } catch { }
         }
 
-        // =================== Util ===================
+        // =================================================================
+        // ============================ Utils ===============================
+        // =================================================================
 
         private static byte[] MakePacket(PacketType type, object body)
         {
-            var env = new Envelope
-            {
-                t = (int)type,
-                p = JsonSerializer.Serialize(body)
-            };
+            var env = new Envelope { t = (int)type, p = JsonSerializer.Serialize(body) };
             var json = JsonSerializer.Serialize(env);
             return Encoding.UTF8.GetBytes(json);
         }
@@ -497,7 +571,9 @@ namespace CrazyRiskGame.Play.Net
         private static string San(string s, int max) => (s ?? "").Trim() is var t && t.Length > max ? t[..max] : t;
         private static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        // =================== DTOs / Model ===================
+        // =================================================================
+        // ============================ DTOs ================================
+        // =================================================================
 
         private sealed class Envelope { public int t { get; set; } public string? p { get; set; } }
 
@@ -512,19 +588,20 @@ namespace CrazyRiskGame.Play.Net
         public enum PacketType
         {
             Unknown = 0,
-            // Descubrimiento
+            // Discovery
             Discover = 1, DiscoverReply = 2,
-            // Ciclo de unión/estado
+            // Join / state
             JoinRequest = 10, JoinApproved = 11,
             ChangeAvatar = 12, Ready = 13, Leave = 14,
             StateRequest = 15, State = 16
         }
 
+        // ======================= Modelo de estado =========================
         public sealed class LobbyState
         {
             public string? HostName { get; set; }
 
-            // 3 slots máximo: 0=host, 1-2 clientes
+            // 3 slots: 0=host, 1..2 clientes
             public PlayerSlot[] Players { get; set; } = new[]
             {
                 PlayerSlot.Empty(0),
@@ -537,7 +614,8 @@ namespace CrazyRiskGame.Play.Net
             public int PlayerCount()
             {
                 int c = 0;
-                for (int i = 0; i < Players.Length; i++) if (Players[i].IsOccupied) c++;
+                for (int i = 0; i < Players.Length; i++)
+                    if (Players[i].IsOccupied) c++;
                 return c;
             }
 
@@ -561,9 +639,10 @@ namespace CrazyRiskGame.Play.Net
 
             public bool AllReady()
             {
+                // aquí definimos “todos” = los ocupados (host + todos los conectados)
                 for (int i = 0; i < Players.Length; i++)
                 {
-                    if (!Players[i].IsOccupied) return false; // queremos los 3
+                    if (!Players[i].IsOccupied) return false;
                     if (!Players[i].Ready) return false;
                 }
                 return true;
@@ -598,7 +677,7 @@ namespace CrazyRiskGame.Play.Net
             public bool Ready;
             public bool IsHost;
 
-            // Host-only: tracking del cliente
+            // Host-only: tracking
             public long LastSeenUtcMs;
             public IPEndPoint? Remote;
 
@@ -617,7 +696,7 @@ namespace CrazyRiskGame.Play.Net
         }
     }
 
-    // -------------- Descubrimiento: resultado --------------
+    // ================= Resultados de descubrimiento =====================
     public sealed class DiscoveredHost
     {
         public IPEndPoint EndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, LanLobby.BROADCAST_PORT);

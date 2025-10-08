@@ -7,15 +7,21 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Audio;
+
+// Core
 using CrazyRisk.Core;
 
-// === Integraciones ===
+// Aliases / Adapters
 using CoreCardsService = CrazyRisk.Core.CardsService;
 using CrazyRiskGame.Play.Adapters;
 using CrazyRiskGame.Game.Services;
 using CrazyRiskGame.Play.Controllers;
 using CrazyRiskGame.Play.Animations;
 using CrazyRiskGame.Play.UI;
+
+// === Lobby (LAN) ===
+using CrazyRiskGame.Play.UI.Lobby;   // LanLobbyScreen
+using CrazyRiskGame.Net.Lan;         // LanLobby
 
 namespace CrazyRiskGame
 {
@@ -31,8 +37,8 @@ namespace CrazyRiskGame
         private const int UI_TOP_BAR      = 72;
         private const int UI_BOTTOM_BAR   = 72;
 
-        // +++ NUEVO: agregamos estados MenuMultiplayer y Lobby
-        private enum AppState { MenuPrincipal, MenuOpciones, MenuJugar, MenuPersonajes, MenuMultiplayer, Lobby, EnJuego }
+        // +++ Agrego estados de Lobby +++
+        private enum AppState { MenuPrincipal, MenuOpciones, MenuJugar, MenuPersonajes, LobbyHost, LobbyClient, EnJuego }
         private AppState estado = AppState.MenuPrincipal;
 
         // ====== Assets ======
@@ -47,8 +53,6 @@ namespace CrazyRiskGame
         private readonly List<Button> botonesOpciones = new();
         private readonly List<Button> botonesJugar = new();
         private readonly List<Button> botonesPersonajes = new();
-        // +++ NUEVO: submenú Multiplayer
-        private readonly List<Button> botonesMultiplayer = new();
 
         // ====== Selección de avatares ======
         private readonly List<Texture2D> avatarTex = new();
@@ -77,12 +81,14 @@ namespace CrazyRiskGame
 
         // ====== Máscaras / Territorios ======
 
+        // Adyacencia por matriz local (sustituto de TerritoryState.Neighbors)
         private bool AreAdjacent(string fromId, string toId)
         {
             foreach (var n in NeighborsOf(fromId))
                 if (n == toId) return true;
             return false;
         }
+
         private readonly Dictionary<string, Texture2D> maskPorId = new();
         private readonly Dictionary<string, Color[]> maskPixelsPorId = new();
         private readonly Dictionary<string, int> idToIndex = new();
@@ -173,11 +179,9 @@ namespace CrazyRiskGame
         private string? attackFrom;
         private string? attackTo;
 
-        // ====== Multiplayer (estados UI locales mínimos) ======
-        private string playerName = "Jugador";
-        private bool lobbyIsHost = false;
-        private readonly List<string> lobbyPlayers = new(); // simple lista para UI
-        private bool lobbyReadyToStart = false;
+        // ====== Multiplayer (LAN) ======
+        private LanLobby? lanLobby;
+        private LanLobbyScreen? lanScreen;
 
         public Juego()
         {
@@ -381,24 +385,22 @@ namespace CrazyRiskGame
             botonesOpciones.Clear();
             botonesJugar.Clear();
             botonesPersonajes.Clear();
-            botonesMultiplayer.Clear();
             avatarRects.Clear();
 
             int W = graficos.PreferredBackBufferWidth;
             int H = graficos.PreferredBackBufferHeight;
 
-            // Menú principal (agregamos 4ta opción: Multiplayer)
+            // Menú principal
             int bw = (int)(W * 0.28f);
             int bh = 46;
             int cx = W / 2 - bw / 2;
             int gap = 12;
-            int totalH = bh * 4 + gap * 3;
+            int totalH = bh * 3 + gap * 2;
             int startY = H / 2 - totalH / 2;
 
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 0, bw, bh), Text = "Jugar" });
             botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 1, bw, bh), Text = "Opciones" });
-            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 2, bw, bh), Text = "Multiplayer (LAN)" });
-            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 3, bw, bh), Text = "Salir" });
+            botonesMenu.Add(new Button { Bounds = new Rectangle(cx, startY + (bh + gap) * 2, bw, bh), Text = "Salir" });
 
             // Opciones
             int oy = H / 2 - (bh * 5 + gap * 4) / 2;
@@ -409,10 +411,11 @@ namespace CrazyRiskGame
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 3, bw, bh), Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}" });
             botonesOpciones.Add(new Button { Bounds = new Rectangle(cx, oy + (bh + gap) * 4, bw, bh), Text = "Volver" });
 
-            // Jugar
-            int jy = H / 2 - (bh * 2 + gap) / 2;
+            // Jugar (agrego opción Multiplayer)
+            int jy = H / 2 - (bh * 3 + gap * 2) / 2;
             botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 0, bw, bh), Text = "Partida rapida" });
-            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 1, bw, bh), Text = "Volver" });
+            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 1, bw, bh), Text = "Multiplayer (LAN)" });
+            botonesJugar.Add(new Button { Bounds = new Rectangle(cx, jy + (bh + gap) * 2, bw, bh), Text = "Volver" });
 
             // Personajes (grid 3x2)
             int cols = 3, rows = 2;
@@ -436,12 +439,6 @@ namespace CrazyRiskGame
             int baseY = gy + gridH + 30;
             botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY, bw2, 56), Text = "Confirmar" });
             botonesPersonajes.Add(new Button { Bounds = new Rectangle(W/2 - bw2/2, baseY + 72, bw2, 56), Text = "Volver" });
-
-            // Multiplayer (LAN) submenu
-            int my = H / 2 - (bh * 3 + gap * 2) / 2;
-            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 0, bw, bh), Text = "Crear lobby (host)" });
-            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 1, bw, bh), Text = "Unirse a lobby" });
-            botonesMultiplayer.Add(new Button { Bounds = new Rectangle(cx, my + (bh + gap) * 2, bw, bh), Text = "Volver" });
         }
 
         private void RebuildSideTabs()
@@ -562,6 +559,7 @@ namespace CrazyRiskGame
 
             if (estado == AppState.EnJuego)
             {
+                // Cargar mapa lógico; si no existe el JSON, exportamos y recargamos
                 if (mapaCore == null)
                 {
                     ExportarTerritoriesJson();
@@ -586,7 +584,6 @@ namespace CrazyRiskGame
                     try { attackService    = new AttackService(engine!); } catch { attackService = null; }
                     turnService            = new TurnService(engine!);
                     continentBonusService  = null;
-                    // cardsService        = new CardsService();
 
                     reinforcementController = new ReinforcementController(engine!);
                     fortifyController       = new FortifyController(engine!);
@@ -615,6 +612,35 @@ namespace CrazyRiskGame
             }
         }
 
+        // ======== LOBBY helpers ========
+        private void StartLobbyHost()
+        {
+            lanLobby?.Dispose();
+            lanLobby = new LanLobby();
+            if (!lanLobby.StartHost("Host-" + Environment.MachineName))
+            {
+                uiLog.Add("[LAN] No se pudo iniciar host.");
+                return;
+            }
+            lanLobby.SetReady(false);
+
+            lanScreen = new LanLobbyScreen(GraphicsDevice, font, avatarTex, lanLobby, LanLobbyScreen.Mode.Host);
+            estado = AppState.LobbyHost;
+        }
+
+        private void StartLobbyClient()
+        {
+            lanLobby?.Dispose();
+            lanLobby = new LanLobby();
+            if (!lanLobby.StartClient("Player-" + Environment.MachineName))
+            {
+                uiLog.Add("[LAN] No se pudo iniciar cliente.");
+                return;
+            }
+            lanScreen = new LanLobbyScreen(GraphicsDevice, font, avatarTex, lanLobby, LanLobbyScreen.Mode.Client);
+            estado = AppState.LobbyClient;
+        }
+
         // ======== Update ========
         protected override void Update(GameTime gameTime)
         {
@@ -622,22 +648,25 @@ namespace CrazyRiskGame
             var mouse = Mouse.GetState();
             var pos = new Point(mouse.X, mouse.Y);
 
+            // Captura de input (adapter)
             input?.Capture();
 
-            // ESC navegación
-            if (kb.IsKeyDown(Keys.Escape) && !prevKb.IsKeyDown(Keys.Escape))
+            // ESC para atrás
+            if (kb.IsKeyDown(Keys.Escape))
             {
                 switch (estado)
                 {
                     case AppState.MenuOpciones:
                     case AppState.MenuJugar:
                     case AppState.MenuPersonajes:
-                    case AppState.MenuMultiplayer:
                         CambiarEstado(AppState.MenuPrincipal);
                         break;
-                    case AppState.Lobby:
-                        // salir del lobby vuelve al submenú Multiplayer
-                        CambiarEstado(AppState.MenuMultiplayer);
+                    case AppState.LobbyHost:
+                    case AppState.LobbyClient:
+                        lanScreen?.LeaveLobby();
+                        lanScreen = null;
+                        lanLobby = null;
+                        CambiarEstado(AppState.MenuPrincipal);
                         break;
                     case AppState.EnJuego:
                         CambiarEstado(AppState.MenuPrincipal);
@@ -648,7 +677,31 @@ namespace CrazyRiskGame
                 }
             }
 
-            if (estado == AppState.MenuPrincipal || estado == AppState.MenuOpciones || estado == AppState.MenuJugar || estado == AppState.MenuPersonajes || estado == AppState.MenuMultiplayer)
+            // ==== LOBBY ====
+            if (estado == AppState.LobbyHost || estado == AppState.LobbyClient)
+            {
+                lanScreen?.Update(gameTime);
+
+                if (lanScreen?.BackRequested == true)
+                {
+                    lanScreen?.LeaveLobby();
+                    lanScreen = null;
+                    lanLobby = null;
+                    CambiarEstado(AppState.MenuPrincipal);
+                    prevKb = kb; prevMouse = mouse; base.Update(gameTime); return;
+                }
+
+                if (lanScreen?.Lobby.State.GameStarting == true)
+                {
+                    CambiarEstado(AppState.EnJuego);
+                    prevKb = kb; prevMouse = mouse; base.Update(gameTime); return;
+                }
+
+                prevKb = kb; prevMouse = mouse; base.Update(gameTime); return;
+            }
+
+            // ==== MENÚS (no EnJuego) ====
+            if (estado != AppState.EnJuego)
             {
                 UpdateMenus(kb, mouse, pos);
                 prevKb = kb;
@@ -657,17 +710,7 @@ namespace CrazyRiskGame
                 return;
             }
 
-            if (estado == AppState.Lobby)
-            {
-                UpdateLobby(mouse, pos);
-                prevKb = kb;
-                prevMouse = mouse;
-                base.Update(gameTime);
-                return;
-            }
-
             // ===== En Juego =====
-
             sideCollapseButton.Hover = sideCollapseButton.Bounds.Contains(pos);
             if (Clicked(sideCollapseButton.Bounds, mouse))
             {
@@ -759,7 +802,99 @@ namespace CrazyRiskGame
             prevMouse = mouse;
             base.Update(gameTime);
         }
-        // ======== Botones de la barra inferior ========
+
+        private void UpdateMenus(KeyboardState kb, MouseState mouse, Point pos)
+        {
+            var lista = estado switch
+            {
+                AppState.MenuOpciones => botonesOpciones,
+                AppState.MenuJugar => botonesJugar,
+                AppState.MenuPersonajes => botonesPersonajes,
+                _ => botonesMenu
+            };
+
+            // Hover
+            if (estado != AppState.MenuPersonajes)
+            {
+                for (int i = 0; i < lista.Count; i++)
+                {
+                    var b = lista[i];
+                    b.Hover = b.Bounds.Contains(pos);
+                    if (estado == AppState.MenuOpciones) botonesOpciones[i] = b;
+                    else if (estado == AppState.MenuJugar) botonesJugar[i] = b;
+                    else botonesMenu[i] = b;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < botonesPersonajes.Count; i++)
+                {
+                    var b = botonesPersonajes[i];
+                    b.Hover = b.Bounds.Contains(pos);
+                    botonesPersonajes[i] = b;
+                }
+            }
+
+            // Clicks
+            if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
+            {
+                if (estado == AppState.MenuPrincipal)
+                {
+                    if (botonesMenu[0].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuJugar); }
+                    else if (botonesMenu[1].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuOpciones); }
+                    else if (botonesMenu[2].Bounds.Contains(pos)) { Exit(); }
+                }
+                else if (estado == AppState.MenuOpciones)
+                {
+                    if (botonesOpciones[0].Bounds.Contains(pos))
+                    { cfg.Fullscreen = !cfg.Fullscreen; AplicarConfigVisual(); RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[1].Bounds.Contains(pos))
+                    { cfg.MusicEnabled = !cfg.MusicEnabled; if (!cfg.MusicEnabled) StopMusic(); else if (estado != AppState.EnJuego) AplicarConfigAudio(true); RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[2].Bounds.Contains(pos))
+                    { cfg.MusicVolume = MathF.Max(0f, cfg.MusicVolume - 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
+                    else if (botonesOpciones[3].Bounds.Contains(pos))
+                    { cfg.MusicVolume = MathF.Min(1f, cfg.MusicVolume + 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
+                    else if (botonesOpciones[4].Bounds.Contains(pos))
+                    { cfg.SfxEnabled = !cfg.SfxEnabled; RebuildMenus(); GuardarConfig(); }
+                    else if (botonesOpciones[5].Bounds.Contains(pos))
+                    { CambiarEstado(AppState.MenuPrincipal); }
+
+                    // refrescar textos
+                    var b0 = botonesOpciones[0]; b0.Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}"; botonesOpciones[0] = b0;
+                    var b1 = botonesOpciones[1]; b1.Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}"; botonesOpciones[1] = b1;
+                    var b4 = botonesOpciones[4]; b4.Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}"; botonesOpciones[4] = b4;
+                }
+                else if (estado == AppState.MenuJugar)
+                {
+                    if (botonesJugar[0].Bounds.Contains(pos))
+                    { selectedAvatarIndex = -1; CambiarEstado(AppState.MenuPersonajes); }
+                    else if (botonesJugar[1].Bounds.Contains(pos))
+                    { StartLobbyHost(); /* o StartLobbyClient(); si quieres entrar como cliente */ }
+                    else if (botonesJugar[2].Bounds.Contains(pos))
+                    { CambiarEstado(AppState.MenuPrincipal); }
+                }
+                else if (estado == AppState.MenuPersonajes)
+                {
+                    for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
+                        if (avatarRects[i].Contains(pos)) { selectedAvatarIndex = i; break; }
+
+                    if (botonesPersonajes[0].Bounds.Contains(pos))
+                    {
+                        if (selectedAvatarIndex >= 0)
+                        {
+                            avatarIndexByPlayer[0] = selectedAvatarIndex;
+                            CambiarEstado(AppState.EnJuego);
+                        }
+                        else Console.WriteLine("[UI] Debes elegir un avatar.");
+                    }
+                    else if (botonesPersonajes[1].Bounds.Contains(pos))
+                    {
+                        CambiarEstado(AppState.MenuJugar);
+                    }
+                }
+            }
+        }
+
         private void OnBottomButtonClick(string text)
         {
             if (engine == null) return;
@@ -777,7 +912,7 @@ namespace CrazyRiskGame
                 case "Cancelar":
                     territorioSeleccionado = null;
                     attackFrom = null;
-                    attackTo = null;
+                    attackTo   = null;
                     uiLog.Add("Cancelado.");
                     diceState = DiceState.Idle;
                     break;
@@ -788,18 +923,16 @@ namespace CrazyRiskGame
                     sideTab = engine.State.Phase switch
                     {
                         Phase.Reinforcement => SideTab.Refuerzos,
-                        Phase.Attack => SideTab.Ataque,
-                        _ => SideTab.Movimiento
+                        Phase.Attack        => SideTab.Ataque,
+                        _                   => SideTab.Movimiento
                     };
 
-                    // reset selecciones transversales por fase
                     if (engine.State.Phase != Phase.Attack) { attackFrom = attackTo = null; }
                     if (engine.State.Phase != Phase.Fortify) { territorioSeleccionado = null; }
-
                     break;
             }
         }
-        // ======== Click izquierdo sobre el mapa ========
+
         private void OnMapLeftClick(int mx, int my)
         {
             if (engine == null) return;
@@ -822,241 +955,86 @@ namespace CrazyRiskGame
                     break;
 
                 case Phase.Attack:
+                {
+                    if (attackFrom == null)
                     {
-                        // Primer click: atacante propio (>1 tropas). Segundo: defensor enemigo adyacente.
-                        if (attackFrom == null)
+                        if (engine.State.Territories.TryGetValue(hit, out var fromT)
+                            && fromT.OwnerId == engine.State.CurrentPlayerId
+                            && fromT.Troops > 1)
                         {
-                            if (engine.State.Territories.TryGetValue(hit, out var fromT)
-                                && fromT.OwnerId == engine.State.CurrentPlayerId
-                                && fromT.Troops > 1)
-                            {
-                                attackFrom = hit;
-                                attackTo = null;
-                                uiLog.Add("Atacante seleccionado: " + attackFrom);
-                            }
-                            else
-                            {
-                                uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas para atacar.");
-                            }
+                            attackFrom = hit;
+                            attackTo = null;
+                            uiLog.Add("Atacante seleccionado: " + attackFrom);
                         }
                         else
                         {
-                            if (hit == attackFrom)
+                            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas para atacar.");
+                        }
+                    }
+                    else
+                    {
+                        if (hit == attackFrom)
+                        {
+                            attackFrom = null;
+                            attackTo = null;
+                            uiLog.Add("Atacante deseleccionado.");
+                        }
+                        else
+                        {
+                            if (engine.State.Territories.TryGetValue(hit, out var t)
+                                && t.OwnerId != engine.State.CurrentPlayerId
+                                && AreAdjacent(attackFrom!, hit))
                             {
-                                attackFrom = null;
-                                attackTo = null;
-                                uiLog.Add("Atacante deseleccionado.");
+                                attackTo = hit;
+                                uiLog.Add("Objetivo seleccionado: " + attackTo);
                             }
                             else
                             {
-                                if (engine.State.Territories.TryGetValue(hit, out var t)
-                                    && t.OwnerId != engine.State.CurrentPlayerId
-                                    && AreAdjacent(attackFrom!, hit))
-                                {
-                                    attackTo = hit;
-                                    uiLog.Add("Objetivo seleccionado: " + attackTo);
-                                }
-                                else
-                                {
-                                    uiLog.Add("[INFO] El defensor debe ser enemigo y adyacente.");
-                                }
+                                uiLog.Add("[INFO] El defensor debe ser enemigo y adyacente.");
                             }
                         }
-                        break;
                     }
+                    break;
+                }
 
                 case Phase.Fortify:
+                {
+                    if (territorioSeleccionado == null)
                     {
-                        // Primer click: origen propio (>1). Segundo: destino propio adyacente
-                        if (territorioSeleccionado == null)
+                        if (engine.State.Territories.TryGetValue(hit, out var from)
+                            && from.OwnerId == engine.State.CurrentPlayerId
+                            && from.Troops > 1)
                         {
-                            if (engine.State.Territories.TryGetValue(hit, out var from)
-                                && from.OwnerId == engine.State.CurrentPlayerId
-                                && from.Troops > 1)
-                            {
-                                territorioSeleccionado = hit;
-                                uiLog.Add("Fortificar origen: " + hit);
-                            }
-                            else
-                            {
-                                uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas como origen.");
-                            }
+                            territorioSeleccionado = hit;
+                            uiLog.Add("Fortificar origen: " + hit);
                         }
                         else
                         {
-                            if (hit == territorioSeleccionado)
-                            {
-                                territorioSeleccionado = null;
-                                uiLog.Add("Fortificar: origen deseleccionado.");
-                            }
-                            else if (engine.State.Territories.TryGetValue(hit, out var to)
-                                     && to.OwnerId == engine.State.CurrentPlayerId
-                                     && AreAdjacent(territorioSeleccionado!, hit))
-                            {
-                                int move = Math.Max(1, moveAmountSlider);
-                                // Simulación: aquí iría tu llamada real a FortifyService cuando lo conectes.
-                                uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move})");
-                                territorioSeleccionado = null;
-                            }
-                            else
-                            {
-                                territorioSeleccionado = null;
-                                uiLog.Add("[INFO] El destino debe ser propio y adyacente al origen.");
-                            }
+                            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas como origen.");
                         }
-                        break;
                     }
-            }
-        }
-
-        private void UpdateMenus(KeyboardState kb, MouseState mouse, Point pos)
-        {
-            var lista = estado switch
-            {
-                AppState.MenuOpciones => botonesOpciones,
-                AppState.MenuJugar => botonesJugar,
-                AppState.MenuPersonajes => botonesPersonajes,
-                AppState.MenuMultiplayer => botonesMultiplayer,
-                _ => botonesMenu
-            };
-
-            if (estado != AppState.MenuPersonajes)
-            {
-                for (int i = 0; i < lista.Count; i++)
-                {
-                    var b = lista[i];
-                    b.Hover = b.Bounds.Contains(pos);
-
-                    if (estado == AppState.MenuOpciones) botonesOpciones[i] = b;
-                    else if (estado == AppState.MenuJugar) botonesJugar[i] = b;
-                    else if (estado == AppState.MenuMultiplayer) botonesMultiplayer[i] = b;
-                    else botonesMenu[i] = b;
-                }
-            }
-            else
-            {
-                for (int i = 0; i < botonesPersonajes.Count; i++)
-                {
-                    var b = botonesPersonajes[i];
-                    b.Hover = b.Bounds.Contains(pos);
-                    botonesPersonajes[i] = b;
-                }
-            }
-
-            if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
-            {
-                if (estado == AppState.MenuPrincipal)
-                {
-                    if (botonesMenu[0].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuJugar); }
-                    else if (botonesMenu[1].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuOpciones); }
-                    else if (botonesMenu[2].Bounds.Contains(pos)) { CambiarEstado(AppState.MenuMultiplayer); }
-                    else if (botonesMenu[3].Bounds.Contains(pos)) { Exit(); }
-                }
-                else if (estado == AppState.MenuOpciones)
-                {
-                    if (botonesOpciones[0].Bounds.Contains(pos))
-                    { cfg.Fullscreen = !cfg.Fullscreen; AplicarConfigVisual(); RebuildMenus(); GuardarConfig(); }
-                    else if (botonesOpciones[1].Bounds.Contains(pos))
-                    { cfg.MusicEnabled = !cfg.MusicEnabled; if (!cfg.MusicEnabled) StopMusic(); else if (estado != AppState.EnJuego) AplicarConfigAudio(true); RebuildMenus(); GuardarConfig(); }
-                    else if (botonesOpciones[2].Bounds.Contains(pos))
-                    { cfg.MusicVolume = MathF.Max(0f, cfg.MusicVolume - 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
-                    else if (botonesOpciones[3].Bounds.Contains(pos))
-                    { cfg.MusicVolume = MathF.Min(1f, cfg.MusicVolume + 0.1f); if (currentMusic != null) currentMusic.Volume = cfg.MusicVolume; SoundEffect.MasterVolume = cfg.MusicVolume; GuardarConfig(); }
-                    else if (botonesOpciones[4].Bounds.Contains(pos))
-                    { cfg.SfxEnabled = !cfg.SfxEnabled; RebuildMenus(); GuardarConfig(); }
-                    else if (botonesOpciones[5].Bounds.Contains(pos))
-                    { CambiarEstado(AppState.MenuPrincipal); }
-
-                    var b0 = botonesOpciones[0]; b0.Text = $"Pantalla completa: {(cfg.Fullscreen ? "ON" : "OFF")}"; botonesOpciones[0] = b0;
-                    var b1 = botonesOpciones[1]; b1.Text = $"Musica: {(cfg.MusicEnabled ? "ON" : "OFF")}"; botonesOpciones[1] = b1;
-                    var b4 = botonesOpciones[4]; b4.Text = $"SFX: {(cfg.SfxEnabled ? "ON" : "OFF")}"; botonesOpciones[4] = b4;
-                }
-                else if (estado == AppState.MenuJugar)
-                {
-                    if (botonesJugar[0].Bounds.Contains(pos))
-                    { selectedAvatarIndex = -1; CambiarEstado(AppState.MenuPersonajes); }
-                    else if (botonesJugar[1].Bounds.Contains(pos))
-                    { CambiarEstado(AppState.MenuPrincipal); }
-                }
-                else if (estado == AppState.MenuPersonajes)
-                {
-                    for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
-                        if (avatarRects[i].Contains(pos)) { selectedAvatarIndex = i; break; }
-
-                    if (botonesPersonajes[0].Bounds.Contains(pos))
+                    else
                     {
-                        if (selectedAvatarIndex >= 0)
+                        if (hit == territorioSeleccionado)
                         {
-                            avatarIndexByPlayer[0] = selectedAvatarIndex;
-                            CambiarEstado(AppState.EnJuego);
+                            territorioSeleccionado = null;
+                            uiLog.Add("Fortificar: origen deseleccionado.");
                         }
-                        else Console.WriteLine("[UI] Debes elegir un avatar.");
+                        else if (engine.State.Territories.TryGetValue(hit, out var to)
+                             && to.OwnerId == engine.State.CurrentPlayerId
+                             && AreAdjacent(territorioSeleccionado!, hit))
+                        {
+                            int move = Math.Max(1, moveAmountSlider);
+                            uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move})");
+                            territorioSeleccionado = null;
+                        }
+                        else
+                        {
+                            territorioSeleccionado = null;
+                            uiLog.Add("[INFO] El destino debe ser propio y adyacente al origen.");
+                        }
                     }
-                    else if (botonesPersonajes[1].Bounds.Contains(pos))
-                    {
-                        CambiarEstado(AppState.MenuJugar);
-                    }
-                }
-                else if (estado == AppState.MenuMultiplayer)
-                {
-                    if (botonesMultiplayer[0].Bounds.Contains(pos))
-                    {
-                        // Crear lobby local (host)
-                        lobbyIsHost = true;
-                        lobbyPlayers.Clear();
-                        lobbyPlayers.Add(playerName + " (Host)");
-                        lobbyReadyToStart = false;
-                        estado = AppState.Lobby;
-                    }
-                    else if (botonesMultiplayer[1].Bounds.Contains(pos))
-                    {
-                        // Unirse a lobby (cliente) - mock
-                        lobbyIsHost = false;
-                        lobbyPlayers.Clear();
-                        lobbyPlayers.Add("Host");
-                        lobbyPlayers.Add(playerName);
-                        lobbyReadyToStart = false;
-                        estado = AppState.Lobby;
-                    }
-                    else if (botonesMultiplayer[2].Bounds.Contains(pos))
-                    {
-                        CambiarEstado(AppState.MenuPrincipal);
-                    }
-                }
-            }
-        }
-
-        // ======== Lobby simple (UI local, sin red todavía) ========
-        private void UpdateLobby(MouseState mouse, Point pos)
-        {
-            // definimos rects botones dentro del lobby
-            int W = graficos.PreferredBackBufferWidth;
-            int H = graficos.PreferredBackBufferHeight;
-
-            int bw = (int)(W * 0.24f);
-            int bh = 42;
-            int cx = W / 2 - bw / 2;
-            int baseY = (int)(H * 0.70f);
-            var btnVolver  = new Rectangle(cx, baseY, bw, bh);
-            var btnIniciar = new Rectangle(cx, baseY - (bh + 12), bw, bh);
-
-            // hover no persistente (solo para dibujado)
-            bool hovBack = btnVolver.Contains(pos);
-            bool hovStart = btnIniciar.Contains(pos);
-
-            if (Clicked(btnVolver, mouse))
-            {
-                CambiarEstado(AppState.MenuMultiplayer);
-                return;
-            }
-
-            if (Clicked(btnIniciar, mouse))
-            {
-                // Solo puede iniciar el host, y con 2-3 jugadores
-                if (lobbyIsHost && lobbyPlayers.Count >= 2)
-                {
-                    lobbyReadyToStart = true;
-                    CambiarEstado(AppState.EnJuego);
+                    break;
                 }
             }
         }
@@ -1108,15 +1086,16 @@ namespace CrazyRiskGame
             GraphicsDevice.Clear(Color.Black);
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
-            // Lobby: pantalla dedicada
-            if (estado == AppState.Lobby)
+            // ====== LOBBY ======
+            if (estado == AppState.LobbyHost || estado == AppState.LobbyClient)
             {
-                DrawLobby();
+                lanScreen?.Draw(spriteBatch);
                 spriteBatch.End();
                 base.Draw(gameTime);
                 return;
             }
 
+            // ====== Menús (no EnJuego) ======
             if (estado != AppState.EnJuego)
             {
                 DrawMenus();
@@ -1125,7 +1104,7 @@ namespace CrazyRiskGame
                 return;
             }
 
-            // Fondo UI
+            // ====== EnJuego ======
             spriteBatch.Draw(pixel, rectTop, new Color(15, 15, 18, 255));
             spriteBatch.Draw(pixel, rectBottom, new Color(15, 15, 18, 255));
             spriteBatch.Draw(pixel, rectSide, new Color(15, 15, 18, 225));
@@ -1133,17 +1112,14 @@ namespace CrazyRiskGame
             DrawRect(rectBottom, new Color(255,255,255,40), 1);
             DrawRect(rectSide, new Color(255,255,255,40), 1);
 
-            // Mapa
             var mapPos = new Vector2(rectMapViewport.X, rectMapViewport.Y);
             spriteBatch.Draw(mapaVisible, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
 
-            // Máscara hover / selección
             if (territorioSeleccionado != null && maskPorId.TryGetValue(territorioSeleccionado, out var selMask))
                 spriteBatch.Draw(selMask, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
             else if (territorioHover != null && maskPorId.TryGetValue(territorioHover, out var hovMask))
                 spriteBatch.Draw(hovMask, mapPos, null, Color.White, 0f, Vector2.Zero, MAP_SCALE, SpriteEffects.None, 0f);
 
-            // HUD superior
             if (font != null && engine != null)
             {
                 string hud = $"Jugador: {engine.State.CurrentPlayerId}   Fase: {engine.State.Phase}";
@@ -1156,7 +1132,6 @@ namespace CrazyRiskGame
                 }
             }
 
-            // Panel lateral
             sideCollapseButton.Bounds = new Rectangle(rectSide.X - 24, rectSide.Y + 8, 24, 28);
             var colBg = sideCollapseButton.Hover ? new Color(255,255,255,220) : new Color(255,255,255,180);
             spriteBatch.Draw(pixel, sideCollapseButton.Bounds, colBg);
@@ -1193,7 +1168,6 @@ namespace CrazyRiskGame
                 DrawSideContent(content);
             }
 
-            // Bottom bar
             foreach (var b in bottomButtons)
             {
                 var bgc = b.Hover ? new Color(255,255,255,210) : new Color(255,255,255,160);
@@ -1208,7 +1182,6 @@ namespace CrazyRiskGame
                 }
             }
 
-            // Overlay info selección
             if (font != null)
             {
                 string sel = territorioSeleccionado ?? "(ninguno)";
@@ -1223,71 +1196,6 @@ namespace CrazyRiskGame
 
             spriteBatch.End();
             base.Draw(gameTime);
-        }
-
-        // ======== Lobby Draw ========
-        private void DrawLobby()
-        {
-            var W = graficos.PreferredBackBufferWidth;
-            var H = graficos.PreferredBackBufferHeight;
-
-            // fondo
-            var bg = menuBg ?? mapaVisible;
-            var scale = ComputeScaleToFit(bg.Width, bg.Height, W, H);
-            var pos = new Vector2((W - bg.Width * scale) * 0.5f, (H - bg.Height * scale) * 0.5f);
-            spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-
-            if (font != null)
-            {
-                string titulo = lobbyIsHost ? "Lobby (Host)" : "Lobby (Cliente)";
-                var size = font.MeasureString(titulo);
-                spriteBatch.DrawString(font, titulo, new Vector2((W - size.X) * 0.5f, 40), Color.White);
-
-                // caja jugadores
-                var box = new Rectangle(W/2 - 300, 120, 600, 320);
-                spriteBatch.Draw(pixel, box, new Color(0,0,0,140));
-                DrawRect(box, Color.White, 2);
-
-                int y = box.Y + 16;
-                spriteBatch.DrawString(font, "Jugadores:", new Vector2(box.X + 16, y), Color.White);
-                y += 28;
-
-                if (lobbyPlayers.Count == 0)
-                {
-                    spriteBatch.DrawString(font, "(vacio... esperando jugadores en la LAN)", new Vector2(box.X + 16, y), Color.White);
-                    y += 22;
-                }
-                else
-                {
-                    foreach (var p in lobbyPlayers)
-                    {
-                        spriteBatch.DrawString(font, "• " + p, new Vector2(box.X + 16, y), Color.White);
-                        y += 22;
-                    }
-                }
-
-                // botones
-                int bw = 280, bh = 42;
-                int cx = W / 2 - bw / 2;
-                int baseY = (int)(H * 0.70f);
-                var btnIniciar = new Rectangle(cx, baseY - (bh + 12), bw, bh);
-                var btnVolver  = new Rectangle(cx, baseY, bw, bh);
-
-                DrawUIButton(btnIniciar, lobbyIsHost ? "Iniciar partida" : "(esperando host)");
-                DrawUIButton(btnVolver, "Volver");
-            }
-        }
-
-        private void DrawUIButton(Rectangle r, string text)
-        {
-            spriteBatch.Draw(pixel, new Rectangle(r.X + 3, r.Y + 3, r.Width, r.Height), new Color(0,0,0,80));
-            spriteBatch.Draw(pixel, r, new Color(255,255,255,170));
-            DrawRect(r, new Color(0,0,0,200), 2);
-            if (font != null)
-            {
-                var size = font.MeasureString(text);
-                spriteBatch.DrawString(font, text, new Vector2(r.X + (r.Width - size.X) * 0.5f, r.Y + (r.Height - size.Y) * 0.5f), Color.Black);
-            }
         }
 
         // ======== Side Content ========
@@ -1333,13 +1241,25 @@ namespace CrazyRiskGame
                     var mouseNow = Mouse.GetState();
                     if (Clicked(r2, mouseNow))
                     {
-                        if (engine == null) { uiLog.Add("[ERR] Engine no inicializado."); }
-                        else if (engine.State.Phase != Phase.Reinforcement) { uiLog.Add("[WARN] No estás en fase de refuerzos."); }
-                        else if (territorioSeleccionado == null) { uiLog.Add("[INFO] Selecciona un territorio propio primero."); }
+                        if (engine == null)
+                        {
+                            uiLog.Add("[ERR] Engine no inicializado.");
+                        }
+                        else if (engine.State.Phase != Phase.Reinforcement)
+                        {
+                            uiLog.Add("[WARN] No estás en fase de refuerzos.");
+                        }
+                        else if (territorioSeleccionado == null)
+                        {
+                            uiLog.Add("[INFO] Selecciona un territorio propio primero.");
+                        }
                         else
                         {
                             int place = Math.Min(refuerzosStep, refuerzosPendientes);
-                            if (place <= 0) { uiLog.Add("[INFO] No hay refuerzos disponibles."); }
+                            if (place <= 0)
+                            {
+                                uiLog.Add("[INFO] No hay refuerzos disponibles.");
+                            }
                             else
                             {
                                 uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementService para aplicar de verdad).");
@@ -1371,12 +1291,22 @@ namespace CrazyRiskGame
                     var mouseNow2 = Mouse.GetState();
                     if (Clicked(btn, mouseNow2))
                     {
-                        if (engine == null) { uiLog.Add("[ERR] Engine no inicializado."); }
-                        else if (engine.State.Phase != Phase.Attack) { uiLog.Add("[WARN] No estás en fase de ataque."); }
-                        else if (attackFrom == null || attackTo == null) { uiLog.Add("[INFO] Selecciona atacante y defensor (click en mapa)."); }
+                        if (engine == null)
+                        {
+                            uiLog.Add("[ERR] Engine no inicializado.");
+                        }
+                        else if (engine.State.Phase != Phase.Attack)
+                        {
+                            uiLog.Add("[WARN] No estás en fase de ataque.");
+                        }
+                        else if (attackFrom == null || attackTo == null)
+                        {
+                            uiLog.Add("[INFO] Selecciona atacante y defensor (click en mapa).");
+                        }
                         else
                         {
                             TryRollDiceFromEngine();
+
                             if (lastRoll != null && lastRoll.TerritoryCaptured)
                             {
                                 attackFrom = null;
@@ -1533,13 +1463,11 @@ namespace CrazyRiskGame
         // ======== Util draw ========
         private void DrawMenus()
         {
-            var W = graficos.PreferredBackBufferWidth;
-            var H = graficos.PreferredBackBufferHeight;
             var bg = menuBg ?? mapaVisible;
-            var scale = ComputeScaleToFit(bg.Width, bg.Height, W, H);
+            var scale = ComputeScaleToFit(bg.Width, bg.Height, graficos.PreferredBackBufferWidth, graficos.PreferredBackBufferHeight);
             var pos = new Vector2(
-                (W - bg.Width * scale) * 0.5f,
-                (H - bg.Height * scale) * 0.5f
+                (graficos.PreferredBackBufferWidth - bg.Width * scale) * 0.5f,
+                (graficos.PreferredBackBufferHeight - bg.Height * scale) * 0.5f
             );
             spriteBatch.Draw(bg, pos, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
@@ -1548,7 +1476,6 @@ namespace CrazyRiskGame
                 AppState.MenuOpciones => botonesOpciones,
                 AppState.MenuJugar => botonesJugar,
                 AppState.MenuPersonajes => botonesPersonajes,
-                AppState.MenuMultiplayer => botonesMultiplayer,
                 _ => botonesMenu
             };
 
@@ -1558,7 +1485,9 @@ namespace CrazyRiskGame
                 {
                     string titulo = "Selecciona tu personaje";
                     var size = font.MeasureString(titulo);
-                    spriteBatch.DrawString(font, titulo, new Vector2((W - size.X) * 0.5f, pos.Y + 16), Color.White);
+                    spriteBatch.DrawString(font, titulo, new Vector2(
+                        (graficos.PreferredBackBufferWidth - size.X) * 0.5f,
+                        pos.Y + 16), Color.White);
                 }
 
                 for (int i = 0; i < avatarRects.Count && i < avatarTex.Count; i++)
@@ -1598,7 +1527,7 @@ namespace CrazyRiskGame
                 return;
             }
 
-            // otros menús (incluye principal / opciones / jugar / multiplayer)
+            // Otros menús
             for (int i = 0; i < lista.Count; i++)
             {
                 var b = lista[i];
