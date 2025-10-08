@@ -10,6 +10,8 @@ using Microsoft.Xna.Framework.Audio;
 using CrazyRisk.Core;
 
 // === Integraciones ===
+using CoreCardsService = CrazyRisk.Core.CardsService;
+// using GameCardsService = CrazyRiskGame.Game.Services.CardsService; // (si algún día quieres usar la otra)
 using CrazyRiskGame.Play.Adapters;
 using CrazyRiskGame.Game.Services;
 using CrazyRiskGame.Play.Controllers;
@@ -73,6 +75,14 @@ namespace CrazyRiskGame
         private readonly Random rng = new();
 
         // ====== Máscaras / Territorios ======
+
+        // Adyacencia vía nuestra matriz (sustituto de TerritoryState.Neighbors)
+private bool AreAdjacent(string fromId, string toId)
+{
+    foreach (var n in NeighborsOf(fromId))
+        if (n == toId) return true;
+    return false;
+} 
         private readonly Dictionary<string, Texture2D> maskPorId = new();
         private readonly Dictionary<string, Color[]> maskPixelsPorId = new();
         private readonly Dictionary<string, int> idToIndex = new();
@@ -85,6 +95,7 @@ namespace CrazyRiskGame
         private string? ultimoLogHover = null;
 
         private KeyboardState prevKb;
+        private MouseState prevMouse; // <-- NUEVO: para detectar flanco de click
         private Map? mapaCore = null;
 
         private static readonly string[] IDS_TERRITORIOS = new[]
@@ -118,7 +129,7 @@ namespace CrazyRiskGame
         private SelectionService? selectionService;
         private TurnService? turnService;
         private ContinentBonusService? continentBonusService;
-        private CardsService? cardsService;
+        private CoreCardsService? cardsService;
 
         private ReinforcementController? reinforcementController;
         private FortifyController? fortifyController;
@@ -153,10 +164,14 @@ namespace CrazyRiskGame
         private const double DICE_ROLL_DURATION = 0.8;
         private readonly int[] diceShown = new int[3];
         private readonly int[] diceShownDef = new int[2];
-        private DiceRollResult? lastRoll;
+        private CrazyRisk.Core.DiceRollResult? lastRoll;
 
         // ====== Movimiento ======
         private int moveAmountSlider = 1;
+
+        // ====== Selección local para ataque ======
+        private string? attackFrom; // <-- NUEVO
+        private string? attackTo;   // <-- NUEVO
 
         public Juego()
         {
@@ -561,7 +576,7 @@ namespace CrazyRiskGame
                     turnService            = new TurnService(engine!);
                     // (TEMP) deshabilitado: tu ctor real de ContinentBonusService pide defs, no el engine
                     continentBonusService  = null;
-                    cardsService           = new CardsService();
+                  //  cardsService           = new CardsService();
 
                     // Controllers (aunque no los usemos para colocar/mover ahora)
                     reinforcementController = new ReinforcementController(engine!);
@@ -577,6 +592,9 @@ namespace CrazyRiskGame
                 }
 
                 territorioSeleccionado = null;
+                attackFrom = null;
+                attackTo   = null;
+
                 sideTab = SideTab.Refuerzos;
                 sideCollapsed = false;
                 RebuildSideTabs();
@@ -623,6 +641,7 @@ namespace CrazyRiskGame
             {
                 UpdateMenus(kb, mouse, pos);
                 prevKb = kb;
+                prevMouse = mouse; // mantener sincronizado también en menús
                 base.Update(gameTime);
                 return;
             }
@@ -630,7 +649,7 @@ namespace CrazyRiskGame
             // ===== En Juego =====
             // Clicks sobre panel lateral
             sideCollapseButton.Hover = sideCollapseButton.Bounds.Contains(pos);
-            if (mouse.LeftButton == ButtonState.Pressed && sideCollapseButton.Bounds.Contains(pos))
+            if (Clicked(sideCollapseButton.Bounds, mouse))
             {
                 sideCollapsed = !sideCollapsed;
                 sideCollapseButton.Text = sideCollapsed ? ">" : "<";
@@ -645,7 +664,7 @@ namespace CrazyRiskGame
                     b.Hover = b.Bounds.Contains(pos);
                     sideTabButtons[i] = b;
 
-                    if (mouse.LeftButton == ButtonState.Pressed && b.Bounds.Contains(pos))
+                    if (Clicked(b.Bounds, mouse))
                         sideTab = (SideTab)i;
                 }
             }
@@ -657,7 +676,7 @@ namespace CrazyRiskGame
                 b.Hover = b.Bounds.Contains(pos);
                 bottomButtons[i] = b;
 
-                if (mouse.LeftButton == ButtonState.Pressed && b.Bounds.Contains(pos))
+                if (Clicked(b.Bounds, mouse))
                     OnBottomButtonClick(b.Text);
             }
 
@@ -683,11 +702,14 @@ namespace CrazyRiskGame
                     ultimoLogHover = territorioHover;
                 }
 
-                if (mouse.LeftButton == ButtonState.Pressed)
+                if (Clicked(new Rectangle(mouse.X, mouse.Y, 1, 1), mouse))
                     OnMapLeftClick(mx, my);
-                if (mouse.RightButton == ButtonState.Pressed)
+
+                if (mouse.RightButton == ButtonState.Pressed && prevMouse.RightButton == ButtonState.Released)
                 {
                     territorioSeleccionado = null;
+                    attackFrom = null;
+                    attackTo   = null;
                     // attackController?.ClearSelection();
                 }
             }
@@ -722,6 +744,7 @@ namespace CrazyRiskGame
             }
 
             prevKb = kb;
+            prevMouse = mouse; // <-- NUEVO: actualizar flanco al final
             base.Update(gameTime);
         }
 
@@ -758,7 +781,7 @@ namespace CrazyRiskGame
             }
 
             // Clicks
-            if (mouse.LeftButton == ButtonState.Pressed)
+            if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
             {
                 if (estado == AppState.MenuPrincipal)
                 {
@@ -831,6 +854,8 @@ namespace CrazyRiskGame
 
                 case "Cancelar":
                     territorioSeleccionado = null;
+                    attackFrom = null;
+                    attackTo   = null;
                     // attackController?.ClearSelection();
                     uiLog.Add("Cancelado.");
                     diceState = DiceState.Idle;
@@ -845,6 +870,11 @@ namespace CrazyRiskGame
                         Phase.Attack        => SideTab.Ataque,
                         _                   => SideTab.Movimiento
                     };
+
+                    // reset selecciones transversales por fase
+                    if (engine.State.Phase != Phase.Attack) { attackFrom = attackTo = null; }
+                    if (engine.State.Phase != Phase.Fortify) { territorioSeleccionado = null; }
+
                     break;
             }
         }
@@ -861,47 +891,104 @@ namespace CrazyRiskGame
                 case Phase.Reinforcement:
                     if (engine.State.Territories.TryGetValue(hit, out var t1) && t1.OwnerId == engine.State.CurrentPlayerId)
                     {
-                        if (refuerzosPendientes > 0)
-                        {
-                            int place = Math.Min(refuerzosStep, refuerzosPendientes);
-                            uiLog.Add($"[SIM] Refuerzos: +{place} en {hit} (pendiente de lógica real).");
-                        }
+                        // Solo selecciona; la colocación real se hace con el botón del panel
                         territorioSeleccionado = hit;
+                        uiLog.Add("Seleccionado para refuerzos: " + hit);
+                    }
+                    else
+                    {
+                        uiLog.Add("[INFO] Selecciona un territorio propio para refuerzos.");
                     }
                     break;
 
                 case Phase.Attack:
-                {
-                    // Versión mínima sin SetAttacker/SetDefender: dejamos marcada la selección local
-                    territorioSeleccionado = hit;
-                    uiLog.Add("Seleccionado en Ataque: " + hit + " (pendiente de integrar selección atacante/defensor)");
-                    break;
-                }
+{
+    // Primer click: territorio atacante propio (con >1 tropas)
+    // Segundo click: territorio defensor (enemigo y adyacente)
+    if (attackFrom == null)
+    {
+        if (engine.State.Territories.TryGetValue(hit, out var fromT)
+            && fromT.OwnerId == engine.State.CurrentPlayerId
+            && fromT.Troops > 1)
+        {
+            attackFrom = hit;
+            attackTo = null;
+            uiLog.Add("Atacante seleccionado: " + attackFrom);
+        }
+        else
+        {
+            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas para atacar.");
+        }
+    }
+    else
+    {
+        if (hit == attackFrom)
+        {
+            attackFrom = null;
+            attackTo = null;
+            uiLog.Add("Atacante deseleccionado.");
+        }
+        else
+        {
+            if (engine.State.Territories.TryGetValue(hit, out var t)
+                && t.OwnerId != engine.State.CurrentPlayerId
+                && AreAdjacent(attackFrom!, hit)) // ← aquí sustituimos el uso de f.Neighbors
+            {
+                attackTo = hit;
+                uiLog.Add("Objetivo seleccionado: " + attackTo);
+            }
+            else
+            {
+                uiLog.Add("[INFO] El defensor debe ser enemigo y adyacente.");
+            }
+        }
+    }
+    break;
+}
 
                 case Phase.Fortify:
-                    // Primer click: origen propio; segundo: destino propio conectado
+                {
+                    // Primer click: origen propio (>1); segundo: destino propio adyacente
                     if (territorioSeleccionado == null)
                     {
-                        if (engine.State.Territories.TryGetValue(hit, out var from) && from.OwnerId == engine.State.CurrentPlayerId)
+                        if (engine.State.Territories.TryGetValue(hit, out var from)
+                            && from.OwnerId == engine.State.CurrentPlayerId
+                            && from.Troops > 1)
                         {
                             territorioSeleccionado = hit;
                             uiLog.Add("Fortificar origen: " + hit);
                         }
+                        else
+                        {
+                            uiLog.Add("[INFO] Selecciona un territorio propio con >1 tropas como origen.");
+                        }
                     }
                     else
                     {
-                        if (engine.State.Territories.TryGetValue(hit, out var to) && to.OwnerId == engine.State.CurrentPlayerId)
+                        if (hit == territorioSeleccionado)
                         {
-                            int move = Math.Max(1, moveAmountSlider);
-                            uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move}) (pendiente de lógica real).");
                             territorioSeleccionado = null;
+                            uiLog.Add("Fortificar: origen deseleccionado.");
                         }
+                        else if (engine.State.Territories.TryGetValue(hit, out var to)
+         && to.OwnerId == engine.State.CurrentPlayerId
+         && AreAdjacent(territorioSeleccionado!, hit))
+{
+    int move = Math.Max(1, moveAmountSlider);
+
+    // SIM: quitamos la llamada a un método inexistente y dejamos el flujo operativo.
+    uiLog.Add($"[SIM] Fortificar: {territorioSeleccionado} -> {hit} ({move})");
+    territorioSeleccionado = null;
+}
+                        
                         else
                         {
                             territorioSeleccionado = null;
+                            uiLog.Add("[INFO] El destino debe ser propio y adyacente al origen.");
                         }
                     }
                     break;
+                }
             }
         }
 
@@ -1092,28 +1179,44 @@ namespace CrazyRiskGame
                         new Vector2(stepBox.X + (stepBox.Width - s.X)/2, stepBox.Y + (stepBox.Height - s.Y)/2), Color.Black);
 
                     var mouse = Mouse.GetState();
-                    if (mouse.LeftButton == ButtonState.Pressed)
+                    if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
                     {
                         var p = new Point(mouse.X, mouse.Y);
                         if (btnMinus.Contains(p)) refuerzosStep = Math.Max(1, refuerzosStep - 1);
                         if (btnPlus.Contains(p))  refuerzosStep = Math.Min(20, refuerzosStep + 1);
                     }
 
+                    // Botón "Colocar en territorio seleccionado"
                     var r2 = new Rectangle(area.X + 6, r1.Bottom + 10, area.Width - 12, 40);
                     DrawUIPrimaryButton(r2, "Colocar en territorio seleccionado");
-                    if (Mouse.GetState().LeftButton == ButtonState.Pressed && r2.Contains(Mouse.GetState().Position))
+
+                    var mouseNow = Mouse.GetState();
+                    if (Clicked(r2, mouseNow))
                     {
-                        if (territorioSeleccionado != null)
+                        if (engine == null)
                         {
-                            int place = Math.Min(refuerzosStep, refuerzosPendientes);
-                            if (place > 0)
-                                uiLog.Add($"[SIM] Botón: +{place} en {territorioSeleccionado} (pendiente de lógica real).");
-                            else
-                                uiLog.Add("[SIM] No hay refuerzos pendientes.");
+                            uiLog.Add("[ERR] Engine no inicializado.");
+                        }
+                        else if (engine.State.Phase != Phase.Reinforcement)
+                        {
+                            uiLog.Add("[WARN] No estás en fase de refuerzos.");
+                        }
+                        else if (territorioSeleccionado == null)
+                        {
+                            uiLog.Add("[INFO] Selecciona un territorio propio primero.");
                         }
                         else
                         {
-                            uiLog.Add("[SIM] Selecciona un territorio primero.");
+                            int place = Math.Min(refuerzosStep, refuerzosPendientes);
+                            if (place <= 0)
+                            {
+                                uiLog.Add("[INFO] No hay refuerzos disponibles.");
+                            }
+                            else
+                            {
+                                // SIM: quitamos la llamada a un método inexistente y mantenemos feedback en UI.
+uiLog.Add($"[SIM] +{place} en {territorioSeleccionado} (conecta ReinforcementService para aplicar de verdad).");
+                            }
                         }
                     }
 
@@ -1124,7 +1227,7 @@ namespace CrazyRiskGame
                 {
                     spriteBatch.DrawString(font, "Ataque", new Vector2(area.X + 6, area.Y + 6), Color.White);
 
-                    // Att/Def info
+                    // Att/Def info (mostrar selección local)
                     var attBox = new Rectangle(area.X + 6, area.Y + 30, area.Width - 12, 54);
                     var defBox = new Rectangle(area.X + 6, attBox.Bottom + 6, area.Width - 12, 54);
                     spriteBatch.Draw(pixel, attBox, new Color(255,255,255,20));
@@ -1132,20 +1235,41 @@ namespace CrazyRiskGame
                     DrawRect(attBox, new Color(255,255,255,60), 1);
                     DrawRect(defBox, new Color(255,255,255,60), 1);
 
-                    if (engine != null)
-                    {
-                        string att = engine.State.PendingAttackFrom ?? "(elige atacante)";
-                        string def = engine.State.PendingAttackTo   ?? "(elige defensor)";
-                        spriteBatch.DrawString(font, $"Atacante: {att}", new Vector2(attBox.X + 8, attBox.Y + 8), Color.White);
-                        spriteBatch.DrawString(font, $"Defensor : {def}", new Vector2(defBox.X + 8, defBox.Y + 8), Color.White);
-                    }
+                    string att = attackFrom ?? "(elige atacante)";
+                    string def = attackTo   ?? "(elige defensor)";
+                    spriteBatch.DrawString(font, $"Atacante: {att}", new Vector2(attBox.X + 8, attBox.Y + 8), Color.White);
+                    spriteBatch.DrawString(font, $"Defensor : {def}", new Vector2(defBox.X + 8, defBox.Y + 8), Color.White);
 
                     // Botón lanzar
                     var btn = new Rectangle(area.X + 6, defBox.Bottom + 10, area.Width - 12, 40);
                     DrawUIPrimaryButton(btn, "Lanzar dados");
-                    if (Mouse.GetState().LeftButton == ButtonState.Pressed && btn.Contains(Mouse.GetState().Position))
+                    var mouseNow2 = Mouse.GetState();
+                    if (Clicked(btn, mouseNow2))
                     {
-                        TryRollDiceFromEngine(); // usa AttackController por dentro
+                        if (engine == null)
+                        {
+                            uiLog.Add("[ERR] Engine no inicializado.");
+                        }
+                        else if (engine.State.Phase != Phase.Attack)
+                        {
+                            uiLog.Add("[WARN] No estás en fase de ataque.");
+                        }
+                        else if (attackFrom == null || attackTo == null)
+                        {
+                            uiLog.Add("[INFO] Selecciona atacante y defensor (click en mapa).");
+                        }
+                        else
+                        {
+                            // Usamos el flujo ya integrado con el controlador para tirar dados/animación
+TryRollDiceFromEngine();
+
+// Si quieres limpiar selección tras cada tiro:
+if (lastRoll != null && lastRoll.TerritoryCaptured)
+{
+    attackFrom = null;
+    attackTo   = null;
+}
+                        }
                     }
 
                     // Tira dados (presentación)
@@ -1220,7 +1344,7 @@ namespace CrazyRiskGame
                     spriteBatch.DrawString(font, moveAmountSlider.ToString(), new Vector2(box.X + (box.Width - s.X)/2, box.Y + (box.Height - s.Y)/2), Color.Black);
 
                     var mouse = Mouse.GetState();
-                    if (mouse.LeftButton == ButtonState.Pressed)
+                    if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
                     {
                         var p = mouse.Position;
                         if (bMinus.Contains(p)) moveAmountSlider = Math.Max(1, moveAmountSlider - 1);
@@ -1272,7 +1396,7 @@ namespace CrazyRiskGame
                 return;
             }
 
-            if (!attackController.RollOnce(out DiceRollResult? r, out string err) || r == null)
+            if (!attackController.RollOnce(out CrazyRisk.Core.DiceRollResult? r, out string err) || r == null)
             {
                 uiLog.Add("No se pudo tirar: " + err);
                 return;
@@ -1291,6 +1415,14 @@ namespace CrazyRiskGame
             int aCount = r.AttackerDice?.Length ?? 0;
             int dCount = r.DefenderDice?.Length ?? 0;
             diceAnimator?.Start(aCount, dCount, DICE_ROLL_DURATION);
+        }
+
+        // ======== Helpers ========
+        private bool Clicked(Rectangle r, MouseState curMouse)
+        {
+            return prevMouse.LeftButton == ButtonState.Released
+                && curMouse.LeftButton == ButtonState.Pressed
+                && r.Contains(curMouse.Position);
         }
 
         // ======== Util draw ========

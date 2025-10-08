@@ -95,6 +95,11 @@ namespace CrazyRiskGame.Game.Services
         }
 
         /// <summary>
+        /// 🔌 Compatibilidad con Juego.cs: mismo efecto que TryPlace(...).
+        /// </summary>
+        public bool PlaceMany(string territoryId, int amount) => TryPlace(territoryId, amount);
+
+        /// <summary>
         /// Deshace la última colocación realizada en esta fase de refuerzos.
         /// Si no hay historial, no hace nada (devuelve false).
         /// </summary>
@@ -114,18 +119,14 @@ namespace CrazyRiskGame.Game.Services
 
             var (territoryId, amount) = _history.Pop();
 
-            // Para deshacer, restamos tropas del territorio y devolvemos pendiente.
-            // No usamos un método del motor porque no existe "RemoveReinforcements".
-            // Lo revertimos de forma controlada sobre el estado.
             var state = _engine.State;
             if (!state.Territories.TryGetValue(territoryId, out var t))
             {
-                // Caso muy raro: el territorio desapareció del diccionario.
                 RaiseError("No se puede deshacer: territorio no encontrado.");
                 return false;
             }
 
-            // Garantizamos dejar al menos 1 tropa (por si el jugador hizo cambios después).
+            // Garantizamos dejar al menos 1 tropa
             int toRemove = Math.Min(amount, t.Troops - 1);
             if (toRemove <= 0)
             {
@@ -144,10 +145,7 @@ namespace CrazyRiskGame.Game.Services
         /// <summary>
         /// Limpia el historial de la fase actual. Útil al terminar la fase o turno.
         /// </summary>
-        public void ClearHistory()
-        {
-            _history.Clear();
-        }
+        public void ClearHistory() => _history.Clear();
 
         /// <summary>
         /// Atajo para colocar 1, 5 o N en función de lo que permita el remanente.

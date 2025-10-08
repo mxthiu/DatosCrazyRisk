@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CrazyRisk.Game")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4273ac9cec3e80a70aaf510355cff3ad8b64ad8d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5337d0d95804195c0c700a4f1317108135ce4bd1")]
 [assembly: System.Reflection.AssemblyProductAttribute("CrazyRisk.Game")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CrazyRisk.Game")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
