@@ -98,10 +98,10 @@ namespace CrazyRiskGame.Game.Services
         public static ContinentBonusService CreateDefault()
         {
             // Bonos típicos orientativos para Risk clásico (ajústalos a tu diseño):
-            // NA: +5, SA: +2, EU: +5, AF: +3, AS: +7, OC: +2
+            // NA: +3, SA: +2, EU: +5, AF: +3, AS: +7, OC: +2
             // Los territorios se detectan por prefijo del id que usamos en el proyecto.
             var NA = new ContinentDef(
-                "Norteamérica", 5, new[]
+                "Norteamérica", 3, new[]
                 {
                     "NORTEAMERICA_CANADA","NORTEAMERICA_ESTADOS_UNIDOS","NORTEAMERICA_MEXICO",
                     "NORTEAMERICA_GROENLANDIA","NORTEAMERICA_CUBA","NORTEAMERICA_HAITI","NORTEAMERICA_GUATEMALA"
