@@ -46,8 +46,8 @@ namespace CrazyRisk.Core
         private int _tradeCount = 0; // cuántos canjes se han hecho (global)
 
         // Semillas de la serie (4, 6, 10, 16, 26, 42, ...)
-        private int _fibA = 4;
-        private int _fibB = 6;
+        private int _fibA = 2;
+        private int _fibB = 3;
 
         /// <summary>
         /// Devuelve lectura de la mano del jugador (lista interna clonada).
