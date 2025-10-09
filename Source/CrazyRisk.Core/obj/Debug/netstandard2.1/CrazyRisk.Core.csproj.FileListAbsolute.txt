@@ -9,3 +9,14 @@
 /Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.sourcelink.json
 /Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.dll
 /Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/Debug/netstandard2.1/CrazyRisk.Core.pdb
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\bin\Debug\netstandard2.1\CrazyRisk.Core.deps.json
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\bin\Debug\netstandard2.1\CrazyRisk.Core.dll
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\bin\Debug\netstandard2.1\CrazyRisk.Core.pdb
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.csproj.AssemblyReference.cache
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.AssemblyInfoInputs.cache
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.AssemblyInfo.cs
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.csproj.CoreCompileInputs.cache
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.sourcelink.json
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.dll
+C:\Users\josaq\Source\Repos\DatosCrazyRisk\Source\CrazyRisk.Core\obj\Debug\netstandard2.1\CrazyRisk.Core.pdb

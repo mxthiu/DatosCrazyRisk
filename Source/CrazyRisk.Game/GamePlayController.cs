@@ -18,9 +18,12 @@ namespace CrazyRiskGame
         public string LastMessage { get; private set; } = "";
         public DiceRollResult? LastRoll { get; private set; }
 
-        public GamePlayController(Map map, IList<PlayerInfo> players, int? seed = null)
+        public GamePlayController(Map map, System.Collections.Generic.IList<PlayerInfo> players, int? seed = null)
         {
-            Engine = new GameEngine(map, players, seed);
+            var lista = new CrazyRisk.Core.DataStructures.Lista<PlayerInfo>();
+            for (int i = 0; i < players.Count; i++)
+                lista.Agregar(players[i]);
+            Engine = new GameEngine(map, lista, seed);
         }
 
         // ---------- Entradas desde la UI ----------

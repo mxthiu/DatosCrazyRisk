@@ -49,7 +49,15 @@ namespace CrazyRiskGame.Play.UI
             DrawRect(sb, pill, new Color(0, 0, 0, 160), 1);
 
             // Nombre jugador
-            var currentPlayer = engine.State.Players.Find(p => p.Id == curId)?.Name ?? $"J{curId}";
+            string currentPlayer = $"J{curId}";
+            for (int i = 0; i < engine.State.Players.Count; i++)
+            {
+                if (engine.State.Players[i].Id == curId)
+                {
+                    currentPlayer = engine.State.Players[i].Name;
+                    break;
+                }
+            }
             string leftText1 = $"Jugador: {currentPlayer}";
             string leftText2 = $"Fase: {engine.State.Phase}";
 

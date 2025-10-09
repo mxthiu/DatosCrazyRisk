@@ -475,24 +475,26 @@
     ]
   },
   "packageFolders": {
-    "/Users/mathi/.nuget/packages/": {}
+    "C:\\Users\\josaq\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/CrazyRisk.Core.csproj",
+      "projectUniqueName": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Core\\CrazyRisk.Core.csproj",
       "projectName": "CrazyRisk.Core",
-      "projectPath": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/CrazyRisk.Core.csproj",
-      "packagesPath": "/Users/mathi/.nuget/packages/",
-      "outputPath": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/obj/",
+      "projectPath": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Core\\CrazyRisk.Core.csproj",
+      "packagesPath": "C:\\Users\\josaq\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Core\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/mathi/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\josaq\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "netstandard2.1"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -511,7 +513,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.100"
     },
     "frameworks": {
       "netstandard2.1": {
@@ -538,7 +540,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.305/RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100-rc.1.25451.107\\RuntimeIdentifierGraph.json"
       }
     }
   }

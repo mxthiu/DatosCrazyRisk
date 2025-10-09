@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <SourceFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_MEXICO.png</SourceFile>
-  <SourceTime>2025-09-28T23:40:36-07:00</SourceTime>
-  <DestFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/bin/DesktopGL/Content/Sprites/masks/NORTEAMERICA_MEXICO.xnb</DestFile>
-  <DestTime>2025-10-02T19:55:16.2925786-07:00</DestTime>
+  <SourceFile>C:/Users/josaq/Source/Repos/DatosCrazyRisk/Source/CrazyRisk.Game/Content/Sprites/masks/NORTEAMERICA_MEXICO.png</SourceFile>
+  <SourceTime>2025-10-08T02:04:17-06:00</SourceTime>
+  <DestFile>C:/Users/josaq/Source/Repos/DatosCrazyRisk/Source/CrazyRisk.Game/Content/bin/DesktopGL/Content/Sprites/masks/NORTEAMERICA_MEXICO.xnb</DestFile>
+  <DestTime>2025-10-09T15:11:21.9136951-06:00</DestTime>
   <Importer>TextureImporter</Importer>
-  <ImporterTime>2025-06-02T03:31:02-07:00</ImporterTime>
+  <ImporterTime>2025-06-02T04:31:02-06:00</ImporterTime>
   <Processor>TextureProcessor</Processor>
-  <ProcessorTime>2025-06-02T03:31:02-07:00</ProcessorTime>
+  <ProcessorTime>2025-06-02T04:31:02-06:00</ProcessorTime>
   <Dependencies />
   <BuildAsset />
   <BuildOutput />

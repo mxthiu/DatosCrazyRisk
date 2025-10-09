@@ -29,11 +29,11 @@ namespace CrazyRiskGame.Game.Services
             int owned = 0;
 
             // Contar territorios del jugador
-            foreach (var kv in state.Territories)
+            state.Territories.ParaCada((key, terr) =>
             {
-                if (kv.Value.OwnerId == playerId)
+                if (terr.OwnerId == playerId)
                     owned++;
-            }
+            });
 
             int baseReinf = owned / 3;
             if (baseReinf < 3) baseReinf = 3;

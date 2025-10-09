@@ -580,7 +580,11 @@ namespace CrazyRiskGame
                 }
                 else
                 {
-                    engine = new GameEngine(mapaCore, players);
+                    var listaPlayers = new CrazyRisk.Core.DataStructures.Lista<PlayerInfo>();
+                    for (int i = 0; i < players.Count; i++)
+                        listaPlayers.Agregar(players[i]);
+                    
+                    engine = new GameEngine(mapaCore, listaPlayers);
 
                     engineAdapter = new EngineAdapter(engine);
                     actionsAdapter = new EngineActionsAdapter(engine);

@@ -110,16 +110,15 @@ namespace CrazyRiskGame.Game.Services
         /// <summary>
         /// Lista los territorios del jugador actual que pueden ser origen (>=2 tropas).
         /// </summary>
-        public List<string> GetValidFromTerritories()
+        public System.Collections.Generic.List<string> GetValidFromTerritories()
         {
-            var list = new List<string>();
+            var list = new System.Collections.Generic.List<string>();
             int pid = engine.State.CurrentPlayerId;
-            foreach (var kv in engine.State.Territories)
+            engine.State.Territories.ParaCada((key, st) =>
             {
-                var st = kv.Value;
                 if (st.OwnerId == pid && st.Troops >= 2)
-                    list.Add(kv.Key);
-            }
+                    list.Add(key);
+            });
             return list;
         }
 
@@ -129,18 +128,17 @@ namespace CrazyRiskGame.Game.Services
         /// </summary>
         public List<string> GetValidToTerritories(string? fromId)
         {
-            var list = new List<string>();
+            var list = new System.Collections.Generic.List<string>();
             if (fromId == null) return list;
 
             int pid = engine.State.CurrentPlayerId;
-            foreach (var kv in engine.State.Territories)
+            engine.State.Territories.ParaCada((key, st) =>
             {
-                if (kv.Key == fromId) continue;
-                var st = kv.Value;
-                if (st.OwnerId != pid) continue;
-                if (engine.AreConnectedByOwnerPath(fromId, kv.Key, pid))
-                    list.Add(kv.Key);
-            }
+                if (key == fromId) return;
+                if (st.OwnerId != pid) return;
+                if (engine.AreConnectedByOwnerPath(fromId, key, pid))
+                    list.Add(key);
+            });
             return list;
         }
 

@@ -26,7 +26,7 @@ namespace CrazyRiskGame.Play.Adapters
         public Phase Phase => Engine.State.Phase;
         public int CurrentPlayerId => Engine.State.CurrentPlayerId;
         public int ReinforcementsRemaining => Engine.State.ReinforcementsRemaining;
-        public IReadOnlyDictionary<string, TerritoryState> Territories => Engine.State.Territories;
+        public CrazyRisk.Core.DataStructures.Diccionario<string, TerritoryState> Territories => Engine.State.Territories;
 
         public bool TryPlaceReinforcements(string territoryId, int amount, out string error)
         {

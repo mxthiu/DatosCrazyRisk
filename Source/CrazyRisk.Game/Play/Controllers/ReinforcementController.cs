@@ -117,10 +117,12 @@ namespace CrazyRiskGame.Play.Controllers
 
             // Sugerir destinos: por ahora, territorios propios (sin ordenar).
             // La UI puede filtrarlos/ordenarlos si quiere.
-            var owned = new List<string>();
-            foreach (var kv in _engine.State.Territories)
-                if (kv.Value.OwnerId == current)
-                    owned.Add(kv.Key);
+            var owned = new System.Collections.Generic.List<string>();
+            _engine.State.Territories.ParaCada((key, terr) =>
+            {
+                if (terr.OwnerId == current)
+                    owned.Add(key);
+            });
 
             return new ReinforcementView(
                 currentPlayerId: current,

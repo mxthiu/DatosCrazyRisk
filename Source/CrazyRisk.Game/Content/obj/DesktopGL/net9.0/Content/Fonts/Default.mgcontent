@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <SourceFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/Fonts/Default.spritefont</SourceFile>
-  <SourceTime>2025-10-01T22:20:28.0796212-07:00</SourceTime>
-  <DestFile>/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/Content/bin/DesktopGL/Content/Fonts/Default.xnb</DestFile>
-  <DestTime>2025-10-02T19:55:16.646151-07:00</DestTime>
+  <SourceFile>C:/Users/josaq/Source/Repos/DatosCrazyRisk/Source/CrazyRisk.Game/Content/Fonts/Default.spritefont</SourceFile>
+  <SourceTime>2025-10-08T02:04:17-06:00</SourceTime>
+  <DestFile>C:/Users/josaq/Source/Repos/DatosCrazyRisk/Source/CrazyRisk.Game/Content/bin/DesktopGL/Content/Fonts/Default.xnb</DestFile>
+  <DestTime>2025-10-09T15:11:22.2451845-06:00</DestTime>
   <Importer>FontDescriptionImporter</Importer>
-  <ImporterTime>2025-06-02T03:31:02-07:00</ImporterTime>
+  <ImporterTime>2025-06-02T04:31:02-06:00</ImporterTime>
   <Processor>FontDescriptionProcessor</Processor>
-  <ProcessorTime>2025-06-02T03:31:02-07:00</ProcessorTime>
+  <ProcessorTime>2025-06-02T04:31:02-06:00</ProcessorTime>
   <Dependencies />
   <BuildAsset />
   <BuildOutput />

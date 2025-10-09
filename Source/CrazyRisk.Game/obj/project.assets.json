@@ -456,32 +456,34 @@
     ]
   },
   "packageFolders": {
-    "/Users/mathi/.nuget/packages/": {}
+    "C:\\Users\\josaq\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/CrazyRisk.Game.csproj",
+      "projectUniqueName": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Game\\CrazyRisk.Game.csproj",
       "projectName": "CrazyRisk.Game",
-      "projectPath": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/CrazyRisk.Game.csproj",
-      "packagesPath": "/Users/mathi/.nuget/packages/",
-      "outputPath": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Game/obj/",
+      "projectPath": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Game\\CrazyRisk.Game.csproj",
+      "packagesPath": "C:\\Users\\josaq\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Game\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/mathi/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\josaq\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/CrazyRisk.Core.csproj": {
-              "projectPath": "/Users/mathi/CrazyRisk/Source/CrazyRisk.Core/CrazyRisk.Core.csproj"
+            "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Core\\CrazyRisk.Core.csproj": {
+              "projectPath": "C:\\Users\\josaq\\Source\\Repos\\DatosCrazyRisk\\Source\\CrazyRisk.Core\\CrazyRisk.Core.csproj"
             }
           }
         }
@@ -496,7 +498,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.100"
     },
     "frameworks": {
       "net9.0": {
@@ -522,12 +524,30 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[9.0.9, 9.0.9]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[9.0.9, 9.0.9]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[9.0.9, 9.0.9]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[9.0.9, 9.0.9]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.305/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100-rc.1.25451.107/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

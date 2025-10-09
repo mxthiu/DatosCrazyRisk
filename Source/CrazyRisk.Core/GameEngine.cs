@@ -1,10 +1,10 @@
 // File: Source/CrazyRisk.Core/GameEngine.cs
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Reflection;
+using CrazyRisk.Core.DataStructures;
 
 namespace CrazyRisk.Core
 {
@@ -192,9 +192,9 @@ namespace CrazyRisk.Core
         public Phase Phase { get; set; } = Phase.Reinforcement;
         public int CurrentPlayerId { get; set; }
         public int ReinforcementsRemaining { get; set; }
-        public Dictionary<string, TerritoryState> Territories { get; set; } =
-            new Dictionary<string, TerritoryState>(StringComparer.Ordinal);
-        public List<PlayerInfo> Players { get; set; } = new();
+        public Diccionario<string, TerritoryState> Territories { get; set; } =
+            new Diccionario<string, TerritoryState>();
+        public Lista<PlayerInfo> Players { get; set; } = new Lista<PlayerInfo>();
         public string? PendingAttackFrom { get; set; }
         public string? PendingAttackTo { get; set; }
 
@@ -211,7 +211,7 @@ namespace CrazyRisk.Core
 
         private readonly Random rng;
 
-        public GameEngine(Map map, IList<PlayerInfo> players, int? seed = null)
+        public GameEngine(Map map, Lista<PlayerInfo> players, int? seed = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             rng = new Random(seed ?? Environment.TickCount);
@@ -219,25 +219,29 @@ namespace CrazyRisk.Core
             if (players == null || players.Count < 2)
                 throw new ArgumentException("Se requieren al menos 2 jugadores.", nameof(players));
 
-            State.Players = new List<PlayerInfo>(players);
+            State.Players = new Lista<PlayerInfo>();
+            for (int i = 0; i < players.Count; i++)
+                State.Players.Agregar(players[i]);
 
             // Recolecta ids de territorios desde Map (con reflexión, ahora soporta propiedades y campos)
-            var terrIds = Map.GetTerritoryIds().ToList();
+            var terrIds = new Lista<string>();
+            foreach (var id in Map.GetTerritoryIds())
+                terrIds.Agregar(id);
+            
             if (terrIds.Count == 0)
                 throw new InvalidOperationException("El mapa no contiene territorios legibles (Id/id).");
 
             Shuffle(terrIds);
 
-            var territoriesDict = new Dictionary<string, TerritoryState>(StringComparer.Ordinal);
+            State.Territories = new Diccionario<string, TerritoryState>();
             int pIndex = 0;
-            foreach (var tid in terrIds)
+            for (int i = 0; i < terrIds.Count; i++)
             {
+                var tid = terrIds[i];
                 var owner = players[pIndex].Id;
-                territoriesDict[tid] = new TerritoryState(tid, owner, troops: 1);
+                State.Territories[tid] = new TerritoryState(tid, owner, troops: 1);
                 pIndex = (pIndex + 1) % players.Count;
             }
-
-            State.Territories = territoriesDict;
 
             int[] startPools = { 0, 0, 40, 35, 30, 25, 20 };
             int pool = players.Count < startPools.Length ? startPools[players.Count] : 20;
@@ -436,25 +440,25 @@ namespace CrazyRisk.Core
             if (fromId == toId) return true;
             if (!Map.ContainsTerritoryId(fromId) || !Map.ContainsTerritoryId(toId)) return false;
 
-            var visited = new HashSet<string>(StringComparer.Ordinal);
-            var q = new Queue<string>();
-            q.Enqueue(fromId);
-            visited.Add(fromId);
+            var visited = new Conjunto<string>();
+            var q = new Cola<string>();
+            q.Encolar(fromId);
+            visited.Agregar(fromId);
 
             while (q.Count > 0)
             {
-                var cur = q.Dequeue();
+                var cur = q.Desencolar();
                 var ns = Map.NeighborsOf(cur);
                 for (int i = 0; i < ns.Count; i++)
                 {
                     var n = ns[i];
-                    if (visited.Contains(n)) continue;
+                    if (visited.Contiene(n)) continue;
                     if (!State.Territories.TryGetValue(n, out var st)) continue;
                     if (st.OwnerId != ownerId) continue;
 
                     if (n == toId) return true;
-                    visited.Add(n);
-                    q.Enqueue(n);
+                    visited.Agregar(n);
+                    q.Encolar(n);
                 }
             }
             return false;
@@ -465,8 +469,10 @@ namespace CrazyRisk.Core
         public int CountOwned(int playerId)
         {
             int c = 0;
-            foreach (var kv in State.Territories)
-                if (kv.Value.OwnerId == playerId) c++;
+            State.Territories.ParaCada((key, value) =>
+            {
+                if (value.OwnerId == playerId) c++;
+            });
             return c;
         }
 
@@ -481,12 +487,14 @@ namespace CrazyRisk.Core
             return arr;
         }
 
-        private void Shuffle<T>(IList<T> list)
+        private void Shuffle(Lista<string> list)
         {
             for (int i = list.Count - 1; i > 0; i--)
             {
                 int j = rng.Next(i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
+                var temp = list[i];
+                list[i] = list[j];
+                list[j] = temp;
             }
         }
 

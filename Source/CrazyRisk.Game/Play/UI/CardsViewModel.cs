@@ -110,7 +110,9 @@ namespace CrazyRiskGame.Play.UI
             error = "";
             var sel = GetSelectionIds();
             if (sel.Count != 3) { error = "Debes seleccionar 3 cartas."; return false; }
-            return _cardsService.CanTradeTriplet(_playerId, sel, out error);
+            var selArray = new int[sel.Count];
+            for (int i = 0; i < sel.Count; i++) selArray[i] = sel[i];
+            return _cardsService.CanTradeTriplet(_playerId, selArray, out error);
         }
 
         /// <summary>
@@ -130,7 +132,10 @@ namespace CrazyRiskGame.Play.UI
                 return false;
             }
 
-            var ok = _cardsService.TradeTriplet(_playerId, sel, out troopsAwarded, out error);
+            var selArray = new int[sel.Count];
+            for (int i = 0; i < sel.Count; i++) selArray[i] = sel[i];
+            
+            var ok = _cardsService.TradeTriplet(_playerId, selArray, out troopsAwarded, out error);
             if (ok)
             {
                 _selected.Clear();

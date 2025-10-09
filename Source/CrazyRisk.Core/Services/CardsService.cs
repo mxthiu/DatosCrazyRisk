@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using CrazyRisk.Core.DataStructures;
 
 namespace CrazyRisk.Core
 {
@@ -41,7 +41,7 @@ namespace CrazyRisk.Core
     /// </summary>
     public sealed class CardsService
     {
-        private readonly Dictionary<int, List<Card>> _cardsByPlayer = new();
+        private readonly Diccionario<int, Lista<Card>> _cardsByPlayer = new Diccionario<int, Lista<Card>>();
         private int _nextCardId = 1;
         private int _tradeCount = 0; // cuántos canjes se han hecho (global)
 
@@ -52,7 +52,7 @@ namespace CrazyRisk.Core
         /// <summary>
         /// Devuelve lectura de la mano del jugador (lista interna clonada).
         /// </summary>
-        public IReadOnlyList<Card> GetPlayerCards(int playerId)
+        public Card[] GetPlayerCards(int playerId)
         {
             if (!_cardsByPlayer.TryGetValue(playerId, out var list))
                 return Array.Empty<Card>();
@@ -66,12 +66,12 @@ namespace CrazyRisk.Core
         {
             if (!_cardsByPlayer.TryGetValue(playerId, out var list))
             {
-                list = new List<Card>(8);
+                list = new Lista<Card>();
                 _cardsByPlayer[playerId] = list;
             }
 
             var card = new Card(_nextCardId++, kind);
-            list.Add(card);
+            list.Agregar(card);
             return card;
         }
 
@@ -116,19 +116,38 @@ namespace CrazyRisk.Core
         /// - 3 distintos (Infantry, Cavalry, Artillery)
         /// - Cualquier combinación con >=1 Wild que pueda completar una de las dos reglas.
         /// </summary>
-        public bool CanTradeTriplet(int playerId, IReadOnlyList<int> cardIds, out string error)
+        public bool CanTradeTriplet(int playerId, int[] cardIds, out string error)
         {
             error = "";
-            if (cardIds == null || cardIds.Count != 3) { error = "Debes elegir exactamente 3 cartas."; return false; }
+            if (cardIds == null || cardIds.Length != 3) { error = "Debes elegir exactamente 3 cartas."; return false; }
 
             // Trae cartas del jugador y resuelve selección
             var hand = GetPlayerCards(playerId);
-            var pick = hand.Where(c => cardIds.Contains(c.Id)).ToArray();
-            if (pick.Length != 3) { error = "Las cartas seleccionadas no pertenecen al jugador."; return false; }
+            var pick = new Lista<Card>();
+            for (int i = 0; i < hand.Length; i++)
+            {
+                for (int j = 0; j < cardIds.Length; j++)
+                {
+                    if (hand[i].Id == cardIds[j])
+                    {
+                        pick.Agregar(hand[i]);
+                        break;
+                    }
+                }
+            }
+            
+            if (pick.Count != 3) { error = "Las cartas seleccionadas no pertenecen al jugador."; return false; }
 
             // Conteos por tipo
-            int wilds = pick.Count(c => c.Kind == CardKind.Wild);
-            var basics = pick.Where(c => c.Kind != CardKind.Wild).Select(c => c.Kind).ToList();
+            int wilds = 0;
+            var basics = new Lista<CardKind>();
+            for (int i = 0; i < pick.Count; i++)
+            {
+                if (pick[i].Kind == CardKind.Wild)
+                    wilds++;
+                else
+                    basics.Agregar(pick[i].Kind);
+            }
 
             // caso 1: 3 básicos iguales (permitiendo wilds que sustituyen)
             if (IsThreeOfAKind(basics, wilds)) return true;
@@ -143,16 +162,24 @@ namespace CrazyRisk.Core
         /// <summary>
         /// Consume las cartas (si son válidas) y devuelve el bono de tropas otorgado.
         /// </summary>
-        public bool TradeTriplet(int playerId, IReadOnlyList<int> cardIds, out int troopsAwarded, out string error)
+        public bool TradeTriplet(int playerId, int[] cardIds, out int troopsAwarded, out string error)
         {
             troopsAwarded = 0;
             if (!CanTradeTriplet(playerId, cardIds, out error)) return false;
 
             // Remover cartas de la mano
             var hand = _cardsByPlayer[playerId];
-            var toRemove = hand.Where(c => cardIds.Contains(c.Id)).ToList();
-            foreach (var c in toRemove)
-                hand.Remove(c);
+            for (int j = 0; j < cardIds.Length; j++)
+            {
+                for (int i = 0; i < hand.Count; i++)
+                {
+                    if (hand[i].Id == cardIds[j])
+                    {
+                        hand.RemoverEn(i);
+                        break;
+                    }
+                }
+            }
 
             // Calcular bono actual y avanzar serie
             troopsAwarded = PreviewNextTradeBonus();
@@ -176,13 +203,13 @@ namespace CrazyRisk.Core
         /// </summary>
         public void ClearAllHands()
         {
-            _cardsByPlayer.Clear();
+            _cardsByPlayer.Limpiar();
             _nextCardId = 1;
         }
 
         // ===================== Helpers de validación =====================
 
-        private static bool IsThreeOfAKind(IReadOnlyList<CardKind> basics, int wilds)
+        private static bool IsThreeOfAKind(Lista<CardKind> basics, int wilds)
         {
             // Queremos terminar con 3 del mismo tipo básico (Inf/Cav/Art).
             // Toma el tipo mayoritario (si hay) y verifica que con wilds se llega a 3.
@@ -191,16 +218,23 @@ namespace CrazyRisk.Core
 
             foreach (CardKind k in new[] { CardKind.Infantry, CardKind.Cavalry, CardKind.Artillery })
             {
-                int count = basics.Count(b => b == k);
+                int count = 0;
+                for (int i = 0; i < basics.Count; i++)
+                    if (basics[i] == k) count++;
+                
                 if (count + wilds >= 3) return true;
             }
             return false;
         }
 
-        private static bool IsThreeAllDifferent(IReadOnlyList<CardKind> basics, int wilds)
+        private static bool IsThreeAllDifferent(Lista<CardKind> basics, int wilds)
         {
             // Meta: cubrir los 3 básicos distintos (Inf, Cav, Art) con ayuda de wilds.
-            var set = new HashSet<CardKind>(basics.Where(k => k != CardKind.Wild));
+            var set = new Conjunto<CardKind>();
+            for (int i = 0; i < basics.Count; i++)
+                if (basics[i] != CardKind.Wild)
+                    set.Agregar(basics[i]);
+            
             int distinctBasics = set.Count;
 
             // Si hay más de 3 básicos distintos (imposible con 3 cartas) o repetidos, evaluamos déficit.
